@@ -1,0 +1,310 @@
+{
+  "name": "rig",
+  "displayName": "Rig",
+  "publisher": "progrium",
+  "description": "",
+  "version": "0.2.0",
+  "engines": {
+    "vscode": "^1.66.0"
+  },
+  "categories": [
+    "Other",
+    "Themes"
+  ],
+  "enabledApiProposals": [
+    "ipc"
+  ],
+  "activationEvents": [
+    "onFileSystem:wanix"
+  ],
+  "extensionKind": [
+    "web"
+  ],
+  "browser": "./dist/web/extension.js",
+  "scripts": {
+    "compile-web": "npm run check-types && node esbuild.js",
+    "watch-web": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/test-web": "^0.0.54",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.4.5"
+  },
+  "contributes": {
+    "keybindings": [
+      {
+        "command": "manifold.fullReload",
+        "key": "ctrl+r",
+        "mac": "cmd+r"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "manifold.deactivateAll",
+          "when": "view == manifold.hierarchy",
+          "group": "navigation@2"
+        },
+        {
+          "command": "manifold.activateAll",
+          "when": "view == manifold.hierarchy",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "manifold.switchView"
+        },
+        {
+          "command": "manifold.reload"
+        },
+        {
+          "command": "manifold.signal"
+        },
+        {
+          "command": "manifold.dump"
+        },
+        {
+          "command": "manifold.callMethod"
+        },
+        {
+          "command": "manifold.viewSource"
+        },
+        {
+          "command": "manifold.rename",
+          "when": "viewItem =~ /obj/"
+        },
+        {
+          "command": "manifold.editField",
+          "when": "viewItem =~ /field/"
+        },
+        {
+          "command": "manifold.delete"
+        },
+        {
+          "command": "manifold.toggleComponents",
+          "when": "viewItem =~ /obj/",
+          "group": "inline"
+        },
+        {
+          "command": "manifold.call",
+          "when": "viewItem =~ /callable/",
+          "group": "inline"
+        },
+        {
+          "command": "manifold.activate",
+          "when": "viewItem =~ /activator/",
+          "group": "inline"
+        },
+        {
+          "command": "manifold.deactivate",
+          "when": "viewItem =~ /deactivator/",
+          "group": "inline"
+        },
+        {
+          "command": "manifold.add",
+          "alt": "manifold.addComponent",
+          "disabled-when": "viewItem =~ /addable/",
+          "group": "inline"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "manifold.deleteFromInspector",
+          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+        },
+        {
+          "command": "manifold.callMethodFromInspector",
+          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+        },
+        {
+          "command": "manifold.viewSourceFromInspector",
+          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+        },
+        {
+          "command": "manifold.implementFromInspector",
+          "when": "webviewId == 'manifold.inspector' && webviewSection == 'ref'"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "rig.createTerminal",
+        "title": "Create New Terminal",
+        "category": "Terminal"
+      },
+      {
+        "command": "manifold.implementFromInspector",
+        "title": "Implement Component",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.callMethodFromInspector",
+        "title": "Call Method...",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.viewSourceFromInspector",
+        "title": "View Source",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.deleteFromInspector",
+        "title": "Delete Component",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.newComponent",
+        "title": "Create New Component"
+      },
+      {
+        "command": "manifold.editBuffer",
+        "title": "Edit Buffer"
+      },
+      {
+        "command": "manifold.openBrowser",
+        "title": "Open Embedded Browser"
+      },
+      {
+        "command": "manifold.editField",
+        "title": "Edit Field...",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.switchView",
+        "title": "Switch View...",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.viewSource",
+        "title": "View Source",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.reload",
+        "title": "Reload",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.rename",
+        "title": "Rename",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.delete",
+        "title": "Delete",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.fullReload",
+        "title": "Full Reload",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.call",
+        "title": "Call",
+        "icon": "$(debug-start)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.activate",
+        "title": "Activate",
+        "icon": "$(debug-start)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.toggleComponents",
+        "title": "Show Components",
+        "icon": "$(gear)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.deactivateAll",
+        "title": "Deactivate All",
+        "icon": "$(debug-stop)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.activateAll",
+        "title": "Activate All",
+        "icon": "$(debug-start)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.deactivate",
+        "title": "Deactivate",
+        "icon": "$(debug-stop)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.add",
+        "title": "Add...",
+        "icon": "$(add)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.addComponent",
+        "title": "Add Component...",
+        "icon": "$(add)",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.callMethod",
+        "title": "Call Method...",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.signal",
+        "title": "Signal...",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.dump",
+        "title": "Dump",
+        "category": "Manifold"
+      },
+      {
+        "command": "manifold.inspect",
+        "title": "Inspect Node",
+        "category": "Manifold"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "manifold",
+          "title": "Rig",
+          "icon": "$(outline-view-icon)"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "manifold-sidebar",
+          "title": "Rig",
+          "icon": "$(outline-view-icon)"
+        }
+      ]
+    },
+    "views": {
+      "manifold": [
+        {
+          "id": "manifold.hierarchy",
+          "name": "Hierarchy"
+        }
+      ],
+      "manifold-sidebar": [
+        {
+          "type": "webview",
+          "id": "manifold-sidebar.inspector",
+          "name": "Inspector"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@progrium/duplex": "^0.2.1"
+  }
+}

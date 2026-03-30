@@ -1,0 +1,106 @@
+<html>
+<head>
+  <!-- <script src="/-/tractor.js"></script>-->
+  <link rel="stylesheet" href="/-/inspector/fontawesome/css/all.min.css" />
+  <style>
+    body {
+      margin: 0;
+      font-size: 11px;
+      font-family: -apple-system, sans-serif;
+      color: #ddd;
+    }
+    input {
+      color: #ddd;
+      font-size: 11px;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid #444;
+    }
+    :root {
+      --fg-color: #000;
+      --bg-color: #fff;
+      --box-border: #444;
+    }
+  </style>
+</head>
+<body style="-webkit-user-select: none; user-select: none;">
+<script type="module">
+  import * as inspector from "/-/inspector/inspector.jsx"
+  import * as ui from "/-/inspector/ui.js"
+  import * as manifold from "/-/inspector/manifold/manifold.ts";
+  import * as duplex from "/-/inspector/duplex/duplex.min.js";
+  import * as util from "/-/inspector/util.ts"
+  
+
+
+  window.m = ui.h;
+  window.nodes = new manifold.Store();
+  
+  var peer = undefined;
+  const conn = await util.connectWithRetry(`ws://${location.host}/-/inspector/ws`, (reconn) => {
+    const sess = new duplex.Session(reconn);
+    if (!peer) {
+      peer = new duplex.Peer(sess, new duplex.CBORCodec());
+    } else {
+      peer.session = sess;
+      peer.caller = new duplex.Client(sess, new duplex.CBORCodec());
+      peer.respond();
+    }
+  });
+  const sess = new duplex.Session(conn);
+	peer = new duplex.Peer(sess, new duplex.CBORCodec());
+
+  peer.handle("update", duplex.HandlerFunc(async (r, c) => {
+    const update = await c.receive();
+    console.log("update:", Object.keys(update).length, update);
+    window.nodes.update(update);
+    ui.redraw();
+  }));
+  peer.respond();
+
+
+  class Backend {
+    setValue(field, value) {
+      peer.call("setValue", {Type: field.TypeName, Selector: field.ID, Value: value });
+    }
+
+    appendValue(field, value) {
+      peer.call("appendValue", {Type: field.TypeName, Selector: `${field.ID}`, Value: value});
+    }
+    
+    removeKey(field, key) {
+      peer.call("unsetValue", {Type: field.TypeName, Selector: `${field.ID}/${key}`});
+    }
+    
+    setKey(field, key, value) {
+      peer.call("setValue", {Type: field.TypeName, Selector: `${field.ID}/${key}`, Value: value });
+    }
+  }
+  window.store = new Backend();
+
+  var selectedID = undefined;
+  var fields = undefined;
+  var mounted = false;
+  window.addEventListener("message", (e) => {
+      if (!e.data.manifold) {
+        return;
+      }
+      selectedID = e.data.id;
+      fields = e.data.fields;
+      if (!mounted) {
+        ui.mount(document.body, App);
+        mounted = true;
+      }
+      ui.redraw();
+  });
+
+  const App = {
+    view: () => 
+      ui.h("main", {style: {position: "absolute", left: "0", top: "0", left: "0", right: "0"}}, 
+        ui.h(inspector.Inspector, {selectedID, fields, store}))
+  }
+
+</script>
+</body>
+</html>

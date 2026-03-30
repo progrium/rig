@@ -1,0 +1,246 @@
+type Cursor interface {
+	Select(path ...string) Cursor
+	Path() string
+
+	ValueTo(v any) error
+	Value() (any, error)
+
+	List() ([]string, error)
+	Meta() (Metadata, error)
+
+	Set(v any) error
+	Delete() error
+	Insert(idx int, v any) error
+	Call(args []any, ret any) error
+}
+
+
+type Endpoint interface {
+	Get(path string) (any, error)
+	Set(path string, v any) error
+	List(path string) ([]string, error)
+	Meta(path string) (Metadata, error)
+	Delete(path string) error
+	Insert(path string, idx int, v any) error
+	Call(path string, args []any, ret any) error
+}
+
+signal.Notifier interface {
+	Signaled(Signal)
+}
+
+signal.Watchable interface {
+	Watch(Notifier)
+	Unwatch(Notifier)
+	Signaled(Signal)
+}
+
+node.Raw struct {
+	ID        string
+	Bus				string `json:",omitempty"` // nested bus names relative to import/export (like b:c if bus b then bus c)
+
+	Name      string
+	Kind			string // obj, com, fld
+	Component string `json:",omitempty"`
+	Value     any
+	Parent    string
+	Linked    map[string][]string // Rel => IDs // use Children/Components/etc?
+	Attrs     map[string]string
+
+	// only used by root node of raw tree
+	Embedded map[string]Raw `json:",omitempty"`
+}
+
+// downward recursion
+Find
+FindAll
+Destroy
+Export
+PathValue
+
+// must find regardless of upstream/downstream
+Resolve(id, visited)
+  // first local
+	// then subs: Resolve
+	// then parent
+
+
+manifold.Bus interface {
+	// module.M
+	// module.External
+
+	signal.Watchable 
+		Watch(Notifier)
+		Unwatch(Notifier)
+		Signaled(Signal)
+
+	// BusExtern API
+
+	Name() string
+
+	Make(name, value) (Node, error) // should delegate if supports path instead of name
+	Instantiate(path, to?) (Node, error) // localFind, then remoteLookup mod.Destroy, delegates
+
+	Find(path) (Node, error)
+	FindAll?(path) []Node // replaces Roots
+
+	Destroy(id) error // localFind, then remoteLookup mod.Destroy, delegates
+
+	Export() ([]Raw, error)
+	Import([]Raw) error // triggers OnAttached
+
+	Close() error
+
+	Signaled(Signal) // if found locally, notify node watchers then module watchers
+	Signals(ctx, chan Signal) error // remote: just calls $signals (which adds watcher to mod)
+		// ^ prototype this api in qtalk
+
+	// BusExtern API end
+
+
+	Select(path) Cursor
+	PathNames() []string
+	PathValue(string) reflect.Value
+
+	// below, not sure if shared between local and external
+
+	// resolve returns error nodes when not found
+	Resolve(id) Node // looks at local nodes then registered buses, caches external (later? cache clearing on destroy)
+		// external includes upstream, which is checked first?
+		// ^ maybe just use Find?
+
+	Store(Node) // Import, Register, Make, Instantiate ... Duplicate
+	Extern(any) Node // used by remote node as well
+
+	RegisterBus(name, Bus) // will register self as upstream on bus
+
+	Register // TODO
+}
+
+manifold.Iterator interface {
+	Next() bool
+	Node() Node
+}
+
+manifold.List interface {
+
+	Parent() Node // Owner? Node? Super?
+	Nodes() []Node
+	Iter() Iterator
+
+	Len() int
+	Index(int) Node
+	IndexOf(Node) (int, bool)
+
+ 	Append(Node) // triggers OnAttached
+	Remove(Node) Node
+	InsertAt(int, Node) // triggers OnAttached
+	RemoveAt(int) Node
+
+	Move? // triggers OnAttached
+
+	// Helpers
+	WithName(string) []Node
+	WithValue(any) []Node
+}
+
+manifold.Node interface {
+	// module.N
+	// module.nodeDelegate
+	// module.externalDelegate
+
+
+	// locks
+	// signal sends (*)
+	// resolves
+
+	signal.Watchable 
+
+	Bus() Bus
+
+	ID() string
+	Kind() string
+	Error() error // "not found" node placeholders, etc
+	Raw() Raw // copy, unless single threaded. always if remotenode
+	// isDestroyed?
+
+	// NodeDelegate API begin
+
+	Name() string
+	SetName(string)*
+	
+	Value() any
+	SetValue(any)*
+
+	Attr(string) string
+	Attrs() []string
+	SetAttr(string, string)*
+
+	Parent() Node // uses Resolve
+	SetParent(id/node)* // triggers OnAttached
+
+	Nodes(kind) []Node // uses Resolve to build slice
+	NodesIndex(kind, id) int
+	NodesInsert(kind, idx, id)* // uses Resolve to SetParent (if not ref)
+	NodesRemove(kind, idx)* // uses Resolve to SetParent (if not ref)
+	NodesMove(kind, idx, to)*
+	// ^ Nodes* necessary? remote client uses Cursor.Call, which could be List (other than Node args)
+	// 		maybe put under sub API? 
+
+	Signaled(signal)
+
+	// NodeDelegate API end
+
+	PathDelete
+	PathNames
+	PathValue
+	PathCall...
+
+	Select(path...) Cursor
+
+	// helpers
+
+	Destroy()
+	Path() string
+
+	List() NodeList // Siblings?
+	Children() NodeList // ChildNodes?
+	Components() NodeList // ComponentNodes?
+	Fields() NodeList // FieldNodes?
+
+	SiblingIndex() int
+	SetSiblingIndex(int)
+	PrevSibling() Node
+	NextSibling() Node
+	Ancestors() []Node // Parents
+
+	FindID(string) Node // uses walk
+
+	AddComponent(v any)
+	RemoveComponent(any)
+	HasComponent(any)
+	Component(any)
+	//ComponentsInChildren
+	//ComponentsInParents
+
+	Walk?
+	Root?
+
+}
+
+manifold
+	module
+	node
+	signal
+
+
+manifold.Value
+manifold.Component
+manifold.Components
+manifold.ComponentsInChildren
+manifold.ComponentsInParents
+
+// Reference resolution (find, etc)
+// Need for Path abstraction?
+// Dict API for attrs someday?
+

@@ -1,0 +1,64 @@
+<html>
+<head>
+  <script src="/-/tractor.js"></script>
+  <link rel="stylesheet" href="/-/vnd/fontawesome/css/all.min.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      color: #ddd;
+    }
+    .TreeView {
+      margin: 0;
+    }
+    .TreeView .node:hover {
+      background-color: #666;
+    }
+    .TreeView .node.selected {
+      background-color: #aaa;
+    }
+  </style>
+</head>
+<body style="-webkit-user-select: none; user-select: none;">
+<script type="module">
+  import * as manifold from "/-/backplane/manifold.jsx"
+  import outline from "/-/vnd/heroicons/outline.jsx"
+  import * as ui from "/-/ui.js"
+  
+  // changing the serialization of manifold means changing
+  // code that worked on that structure, but this acts as an adapter
+  // until then.
+  window.ObjectProxy = (img, id=undefined) => {
+    let o = img.Objects[id||img.Root]
+    if (!o) {
+      console.warn("no object:", id||img.Root)
+    }
+    return new Proxy(o, {
+      get(target, prop, receiver) {
+        if (prop === "Children") {
+          return (Reflect.get(...arguments)||[])
+            .map(id => ObjectProxy(img, id))
+        }
+        if (prop === "Components") {
+          return (Reflect.get(...arguments)||[])
+            .map(id => img.Components[id])
+        }
+        if (prop === "Value") {
+          return (o.Components||[]).map(id => img.Components[id])
+        }
+        return Reflect.get(...arguments)
+      }
+    })
+  }
+
+  T.render(document.body, () => (
+    <main style={{position: "absolute", left: "0", top: "0", left: "0", right: "0"}}>
+      <manifold.TreeView data={ObjectProxy(T.state.Manifold)} />
+    </main>
+  )).then(() => {
+    
+  })
+
+</script>
+</body>
+</html>

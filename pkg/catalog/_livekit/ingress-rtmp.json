@@ -1,0 +1,7 @@
+{
+    "input_type": 0,
+    "name": "rtmp-ingress",
+    "room_name": "theater",
+    "participant_identity": "stream-bot",
+    "participant_name": "Stream Bot"
+}

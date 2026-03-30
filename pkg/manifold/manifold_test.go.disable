@@ -1,0 +1,54 @@
+package manifold_test
+
+import (
+	"testing"
+
+	"tractor.dev/toolkit/exp/manifold"
+	"tractor.dev/toolkit/exp/manifold/module"
+)
+
+func fatal(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type MainComponent struct {
+	Foo string
+}
+
+func TestMainComponent(t *testing.T) {
+	m := module.New(t.Name())
+	n, err := m.Make("@main", &MainComponent{Foo: "test"})
+	fatal(t, err)
+
+	c := manifold.Component[MainComponent](n)
+	if c.Foo != "test" {
+		t.Fatal("unexpected value for Foo")
+	}
+}
+
+type TestComponent struct {
+	Data string
+}
+
+func TestComponents(t *testing.T) {
+	m := module.New(t.Name())
+	n, err := m.Make("@main", nil)
+	fatal(t, err)
+
+	n.AddComponent(&TestComponent{Data: "test1"})
+	n.AddComponent(&MainComponent{Foo: "main"})
+	n.AddComponent(&TestComponent{Data: "test2"})
+
+	coms := manifold.Components[TestComponent](n)
+	if len(coms) != 2 {
+		t.Fatal("unexpected component count")
+	}
+	if coms[0].Data != "test1" {
+		t.Fatal("unexpected value for Data")
+	}
+	if coms[1].Data != "test2" {
+		t.Fatal("unexpected value for Data")
+	}
+}

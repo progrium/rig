@@ -1,0 +1,67 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <script src="./wanix.min.js" type="module"></script>
+    <script src="./workbench.js" type="module"></script>
+    <style>
+        body {
+            margin: 0;
+            height: 100%;
+        }
+        wanix-workbench, wanix-terminal {
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <rig-workbench base="./vscode"></rig-workbench>
+    <script type="module">
+        // Adapter: WebSocket <-> MessagePort
+        function websocketToMessagePort(ws) {
+            // Create a MessageChannel and grab one port to return
+            const { port1, port2 } = new MessageChannel();
+
+            // Forward messages from WebSocket to port1
+            ws.onmessage = (event) => {
+                if (event.data instanceof Blob) {
+                    event.data.arrayBuffer().then(arr => {
+                        const buf = new Uint8Array(arr);
+                        // Only ArrayBuffer is transferable, not TypedArray views like Uint8Array
+                        port1.postMessage(buf, [buf.buffer]);
+                    });
+                    return;
+                } else {
+                    console.warn("Unsupported data type", event.data);
+                }
+            };
+            ws.onclose = () => port1.close();
+
+            // Forward postMessage on port1 to WebSocket send
+            port1.onmessage = (event) => {
+                // Binary or string: just forward
+                ws.send(event.data);
+            };
+
+            port1.onclose = () => {
+                try { ws.close(); } catch(e) {}
+            };
+
+            return port2;
+        }
+
+        import { duplex } from "./wanix.min.js";
+
+        const token = document.cookie.split("; ").find(row => row.startsWith("token=")).split("=")[1];
+        const baseURL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
+        const ws = new WebSocket(`${baseURL}/${token}`);
+        ws.onopen = async () => {
+            const workbench = document.querySelector('rig-workbench');
+            workbench.load(() => websocketToMessagePort(ws));
+            // const sess = new duplex.Session(new duplex.PortConn(websocketToMessagePort(ws)));
+            // const peer = new duplex.Peer(sess, new duplex.CBORCodec());
+            // window.peer = peer;
+        }
+        
+    </script>
+</body>
+</html>

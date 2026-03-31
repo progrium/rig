@@ -7,7 +7,6 @@ import (
 
 	"github.com/andreykaipov/goobs"
 	"github.com/andreykaipov/goobs/api/requests/scenes"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/resource"
@@ -115,7 +114,7 @@ func (l *SceneList) AddNode(typ string, parent manifold.Node, oldView string) (b
 	return false, nil
 }
 
-func (l *SceneList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (l *SceneList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	nodes = resource.ListNodes[Scene](com, l.provider)
 	for _, n := range nodes {
 		nn := manifold.FromEntity(n)

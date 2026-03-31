@@ -18,7 +18,6 @@ import (
 	"github.com/andreykaipov/goobs/api/requests/inputs"
 	"github.com/andreykaipov/goobs/api/requests/sceneitems"
 	"github.com/progrium/rig/pkg/catalog/host"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/util"
@@ -84,7 +83,7 @@ type Client struct {
 	StudioVersion string
 	ServerVersion string
 
-	com entity.Node
+	com node.Node
 }
 
 func (c *Client) OnEnabled() {
@@ -116,10 +115,10 @@ func (c *Client) OnEnabled() {
 	debounce := debouncer.New(500 * time.Millisecond)
 	go c.Client.Listen(func(event any) {
 		if c.com != nil {
-			p := entity.Parent(c.com) // we're assuming node layout
+			p := node.Parent(c.com) // we're assuming node layout
 			if p != nil {
 				debounce(func() {
-					node.Send(p.(entity.Node), "obs-event", nil)
+					node.Send(p.(node.Node), "obs-event", nil)
 				})
 
 			}
@@ -155,7 +154,7 @@ func (c *Client) OnEnabled() {
 	c.ServerVersion = version.ObsWebSocketVersion
 }
 
-func (c *Client) ComponentAttached(com entity.Node) {
+func (c *Client) ComponentAttached(com node.Node) {
 	c.com = com
 }
 
@@ -166,11 +165,11 @@ func (c *Client) OnDisabled() {
 	}
 }
 
-func (c *Client) Nodes(com manifold.Node) entity.Nodes {
+func (c *Client) Nodes(com manifold.Node) node.Nodes {
 	if c.Client == nil {
-		return entity.Nodes{}
+		return node.Nodes{}
 	}
-	return entity.Nodes{
+	return node.Nodes{
 		node.NewID(path.Join(com.ID(), "profiles"), "Profiles",
 			node.Attrs{"view": "obs.ProfileList"},
 			&ProfileList{Client: c},
@@ -190,7 +189,7 @@ type ProfileList struct {
 	Client *Client
 }
 
-func (p *ProfileList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (p *ProfileList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	lst, err := p.Client.Config.GetProfileList()
 	if err != nil {
 		log.Println(err)
@@ -210,7 +209,7 @@ type SceneCollectionList struct {
 	Client *Client
 }
 
-func (sc *SceneCollectionList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (sc *SceneCollectionList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	lst, err := sc.Client.Config.GetSceneCollectionList()
 	if err != nil {
 		log.Println(err)
@@ -230,7 +229,7 @@ type InputTypeList struct {
 	Client *Client
 }
 
-func (it *InputTypeList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (it *InputTypeList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	lst, err := it.Client.Inputs.GetInputKindList()
 	if err != nil {
 		log.Println(err)
@@ -266,15 +265,15 @@ func (c *Configuration) OnEnabled() {
 func (c *Configuration) OnDisabled() {
 }
 
-func (c *Configuration) Nodes(com manifold.Node) entity.Nodes {
+func (c *Configuration) Nodes(com manifold.Node) node.Nodes {
 	if c.Client.Client == nil {
-		return entity.Nodes{}
+		return node.Nodes{}
 	}
 	stream, err := c.Client.Config.GetStreamServiceSettings()
 	if err != nil {
 		log.Println(err)
 	}
-	return entity.Nodes{
+	return node.Nodes{
 		node.NewID(path.Join(com.ID(), "scenes"), "Scenes",
 			node.Attrs{"view": "obs.SceneList"},
 			&SceneList{
@@ -304,7 +303,7 @@ type SceneItemList struct {
 	SceneName string
 }
 
-func (sil *SceneItemList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (sil *SceneItemList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	params := sceneitems.NewGetSceneItemListParams().WithSceneName(sil.SceneName)
 	lst, err := sil.Client.SceneItems.GetSceneItemList(params)
 	if err != nil {
@@ -332,7 +331,7 @@ type InputList struct {
 	Client *Client
 }
 
-func (il *InputList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (il *InputList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	lst, err := il.Client.Inputs.GetInputList()
 	if err != nil {
 		log.Println(err)
@@ -385,7 +384,7 @@ type OutputList struct {
 	Client *Client
 }
 
-func (ol *OutputList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (ol *OutputList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	lst, err := ol.Client.Outputs.GetOutputList()
 	if err != nil {
 		log.Println(err)

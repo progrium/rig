@@ -7,7 +7,6 @@ import (
 	"reflect"
 
 	"github.com/progrium/rig/pkg/depgraph"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"tractor.dev/toolkit-go/engine"
@@ -53,7 +52,7 @@ func (oa *ObjectActivator) ActivateObject(ctx context.Context) error {
 		if com == nil {
 			continue
 		}
-		v := entity.Value(com)
+		v := node.Value(com)
 		if err := asm.Add(v); err != nil {
 			panic(err)
 		}
@@ -62,7 +61,7 @@ func (oa *ObjectActivator) ActivateObject(ctx context.Context) error {
 		}
 		if activator, ok := v.(Activator); ok {
 			if err := activator.Activate(node.Context(ctx, com)); err != nil {
-				if e := entity.SetAttr(obj, "error", fmt.Sprintf("%s: %s", entity.Name(com), err.Error())); e != nil {
+				if e := node.SetAttr(obj, "error", fmt.Sprintf("%s: %s", node.Name(com), err.Error())); e != nil {
 					panic(err)
 				}
 				return err
@@ -87,7 +86,7 @@ func (oa *ObjectActivator) ActivateObject(ctx context.Context) error {
 	}
 
 	if stateful {
-		if err := entity.SetAttr(obj, "activated", "true"); err != nil {
+		if err := node.SetAttr(obj, "activated", "true"); err != nil {
 			return err
 		}
 	}
@@ -116,26 +115,26 @@ func (oa *ObjectActivator) DeactivateObject(ctx context.Context) error {
 		if com == nil {
 			continue
 		}
-		deactivator, ok := entity.Value(com).(Deactivator)
+		deactivator, ok := node.Value(com).(Deactivator)
 		if ok {
 			if err := deactivator.Deactivate(node.Context(ctx, com)); err != nil {
-				if e := entity.SetAttr(obj, "error", fmt.Sprintf("%s: %s", entity.Name(com), err.Error())); e != nil {
+				if e := node.SetAttr(obj, "error", fmt.Sprintf("%s: %s", node.Name(com), err.Error())); e != nil {
 					panic(err)
 				}
 				return err
 			}
 		}
 	}
-	return entity.SetAttr(obj, "activated", "false")
+	return node.SetAttr(obj, "activated", "false")
 }
 
-func resolveComponentTypes(obj entity.Node) (resolved []reflect.Type, missing []reflect.Type, err error) {
+func resolveComponentTypes(obj node.Node) (resolved []reflect.Type, missing []reflect.Type, err error) {
 	var rv []reflect.Type
-	for _, com := range entity.Entities(obj, node.Component) {
-		if !entity.ComponentEnabled(com) {
+	for _, com := range node.Entities(obj, node.Component) {
+		if !node.ComponentEnabled(com) {
 			continue
 		}
-		rv = append(rv, reflect.TypeOf(entity.Value(com)))
+		rv = append(rv, reflect.TypeOf(node.Value(com)))
 	}
 	graph := depgraph.NewDependencyGraph(rv, "Assemble", "Provides")
 	resolved, err = graph.Resolve()
@@ -145,12 +144,12 @@ func resolveComponentTypes(obj entity.Node) (resolved []reflect.Type, missing []
 	return
 }
 
-func componentFromType(obj entity.Node, t reflect.Type) entity.Node {
-	for _, com := range entity.Entities(obj, node.Component) {
-		if !entity.ComponentEnabled(com) {
+func componentFromType(obj node.Node, t reflect.Type) node.Node {
+	for _, com := range node.Entities(obj, node.Component) {
+		if !node.ComponentEnabled(com) {
 			continue
 		}
-		v := entity.Value(com)
+		v := node.Value(com)
 		if reflect.TypeOf(v) == t {
 			return com
 		}

@@ -2,6 +2,7 @@ package node
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -9,28 +10,57 @@ import (
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/meta"
 	"github.com/progrium/rig/pkg/pointers"
 	"github.com/progrium/rig/pkg/signal"
 	"github.com/progrium/rig/pkg/telepath"
 )
 
-type Store struct {
+type Store interface {
+	Resolve(id string, skip ...any) E
+	Store(e E) error
+	Destroy(e E) error
+}
+
+type StoreEntity interface {
+	E
+	SetStore(s Store) error
+	GetStore() Store
+}
+
+func SetStore(v any, s Store) error {
+	if e := ToEntity(v); e != nil {
+		if se, ok := e.(StoreEntity); ok {
+			return se.SetStore(s)
+		}
+	}
+	return errors.ErrUnsupported
+}
+
+func GetStore(v any) Store {
+	if e := ToEntity(v); e != nil {
+		if se, ok := e.(StoreEntity); ok {
+			return se.GetStore()
+		}
+	}
+	return nil
+}
+
+type MemStore struct {
 	nodes map[string]*Raw
 	mu    sync.Mutex
 
-	signal.Dispatcher[entity.E]
+	signal.Dispatcher[E]
 }
 
-func NewStore() *Store {
-	return &Store{
+func NewStore() *MemStore {
+	return &MemStore{
 		nodes: make(map[string]*Raw),
 	}
 }
 
-func EmbeddedStore(n *Raw) *Store {
-	return &Store{
+func EmbeddedStore(n *Raw) *MemStore {
+	return &MemStore{
 		nodes: n.Embedded,
 	}
 }
@@ -48,16 +78,16 @@ func EmbeddedStore(n *Raw) *Store {
 // 	s.Dispatcher.Unwatch(n)
 // }
 
-func (s *Store) Destroy(e entity.E) error {
+func (s *MemStore) Destroy(e E) error {
 	// TODO: walk and destroy linked
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer entity.Send(e, "")
+	defer Send(e, "")
 	delete(s.nodes, e.GetID())
 	return nil
 }
 
-func (s *Store) Store(e entity.E) error {
+func (s *MemStore) Store(e E) error {
 	if r, ok := e.(*Raw); ok {
 		r.mu.Lock()
 		s.mu.Lock()
@@ -68,7 +98,7 @@ func (s *Store) Store(e entity.E) error {
 				embed.root = nil // todo: is this necessary?
 				embed.store = s
 				s.nodes[embed.ID] = embed
-				defer entity.Send(embed, "")
+				defer Send(embed, "")
 			}
 		}
 		// unset embedded nodes and root
@@ -80,13 +110,13 @@ func (s *Store) Store(e entity.E) error {
 
 		s.mu.Unlock()
 		r.mu.Unlock()
-		entity.Send(e, "")
+		Send(e, "")
 		return nil
 	}
 	return fmt.Errorf("unable to store entity: %v", e)
 }
 
-func (s *Store) Resolve(id string, skip ...any) entity.E {
+func (s *MemStore) Resolve(id string, skip ...any) E {
 	// TODO: resolver
 	s.mu.Lock()
 	n, ok := s.nodes[id]
@@ -97,7 +127,7 @@ func (s *Store) Resolve(id string, skip ...any) entity.E {
 	return n
 }
 
-func (s *Store) Export() (data []Raw, err error) {
+func (s *MemStore) Export() (data []Raw, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -137,7 +167,7 @@ type valuePtr struct {
 	dst  string
 }
 
-func (s *Store) Import(data []Raw) error {
+func (s *MemStore) Import(data []Raw) error {
 	var ptrs []valuePtr
 	var loaded []*Raw
 	for _, d := range data {
@@ -145,7 +175,7 @@ func (s *Store) Import(data []Raw) error {
 		if err != nil {
 			return err
 		}
-		if entity.Error(n) != nil {
+		if Error(n) != nil {
 			if IsComponent(n) {
 				if err := DisableComponent(n); err != nil {
 					panic(err)
@@ -169,13 +199,13 @@ func (s *Store) Import(data []Raw) error {
 	for _, ptr := range ptrs {
 		src := s.Resolve(ptr.src)
 		dst := s.Resolve(ptr.dst)
-		if err := telepath.Select(entity.Value(src), ptr.path).Set(entity.Value(dst)); err != nil {
+		if err := telepath.Select(Value(src), ptr.path).Set(Value(dst)); err != nil {
 			return err
 		}
 	}
 	for _, n := range loaded {
-		if p := entity.Parent(n); p != nil && entity.Value(n) != nil {
-			if al, ok := entity.Value(n).(ComponentAttacher); ok {
+		if p := Parent(n); p != nil && Value(n) != nil {
+			if al, ok := Value(n).(ComponentAttacher); ok {
 				go al.ComponentAttached(n)
 			}
 		}
@@ -183,13 +213,13 @@ func (s *Store) Import(data []Raw) error {
 	return nil
 }
 
-func (s *Store) FindValue(v any) (found *Raw, ok bool) {
+func (s *MemStore) FindValue(v any) (found *Raw, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.findValue(v)
 }
 
-func (s *Store) findValue(v any) (found *Raw, ok bool) {
+func (s *MemStore) findValue(v any) (found *Raw, ok bool) {
 	for _, n := range s.nodes {
 		if n.Value == nil || reflect.TypeOf(n.Value).Kind() == reflect.Map {
 			// otherwise un-inflated map[str]any values will be

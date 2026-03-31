@@ -5,14 +5,14 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
+	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/resource"
 )
 
 type Participant livekit.ParticipantInfo
 
-func (r Participant) Entity() entity.E {
+func (r Participant) Entity() node.E {
 	return r
 }
 
@@ -67,6 +67,6 @@ type ParticipantList struct {
 	Room     string
 }
 
-func (l *ParticipantList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (l *ParticipantList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	return resource.ListNodes(com, l.Provider.ParticipantProvider(l.Room))
 }

@@ -3,11 +3,10 @@ package node
 import (
 	"reflect"
 
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/meta"
 )
 
-type Attrs map[string]string
+type Attributes map[string]string
 
 type Children []*Raw
 
@@ -48,7 +47,7 @@ func NewID(id, name string, facets ...any) *Raw {
 	}
 	for _, f := range facets {
 		switch facet := f.(type) {
-		case Attrs:
+		case Attributes:
 			for k, v := range facet {
 				n.Attrs[k] = v
 			}
@@ -87,19 +86,19 @@ func NewID(id, name string, facets ...any) *Raw {
 		}
 	}
 	// todo: wait until this node attached to root so enable can include parents?
-	for _, com := range entity.Entities(n, Component) {
-		if entity.Error(com) != nil {
+	for _, com := range Entities(n, Component) {
+		if Error(com) != nil {
 			continue
 		}
 		if err := EnableComponent(com); err != nil {
-			entity.SetAttr(n, "error", err.Error())
+			SetAttr(n, "error", err.Error())
 			break
 		}
 	}
 	return n
 }
 
-func Snapshot(e entity.Node) Raw {
+func Snapshot(e Node) Raw {
 	if r, ok := e.Entity().(*Raw); ok {
 		v := *r
 		v.Value = dupVal(v.Value)

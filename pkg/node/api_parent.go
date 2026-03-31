@@ -1,4 +1,4 @@
-package entity
+package node
 
 import "errors"
 
@@ -13,7 +13,6 @@ func Parent(v any) E {
 			return ee.GetParent()
 		}
 	}
-	// TODO: fallback to use parentID with resolve
 	return nil
 }
 

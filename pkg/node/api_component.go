@@ -1,6 +1,5 @@
-package entity
+package node
 
-// should this be in node?
 func ComponentEnabled(v any) bool {
 	return Attr(v, "enabled") == "true"
 }

@@ -1,16 +1,14 @@
 package node
 
-import "github.com/progrium/rig/pkg/entity"
-
 const (
 	Object    string = "obj"
 	Component string = "com"
 )
 
 func IsComponent(n any) bool {
-	return entity.ComponentType(n) != ""
+	return ComponentType(n) != ""
 }
 
 func IsObject(n any) bool {
-	return entity.ComponentType(n) == ""
+	return ComponentType(n) == ""
 }

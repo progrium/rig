@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/state"
@@ -120,7 +119,7 @@ func ReadFromList[R any](ctx context.Context, lister Lister[R], id ID) (*R, erro
 }
 
 func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, creator Creater[C, R]) manifold.Node {
-	n := manifold.FromEntity(node.New(name, node.Attrs{
+	n := manifold.FromEntity(node.New(name, node.Attributes{
 		"view": "fields",
 	}))
 	req := new(C)
@@ -138,8 +137,8 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 			r.SetSync(&v)
 			r.CheckSync()
 			nn := node.New(
-				entity.Name(r.Latest),
-				node.Attrs{
+				node.Name(r.Latest),
+				node.Attributes{
 					"view":      "fields",
 					"desc":      string(r.ID),
 					"deletable": "",
@@ -147,14 +146,14 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 				r,
 				&v,
 			)
-			entity.SetStore(nn, entity.GetStore(parent))
+			node.SetStore(nn, node.GetStore(parent))
 
 			lst, _ := node.ComponentNode[L](parent)
 			if lst == nil {
 				log.Panicf("no valid list on: %v", parent)
 			}
 			// add to list component node
-			entity.AppendEntity(lst, node.Object, nn.ID) // error
+			node.AppendEntity(lst, node.Object, nn.ID) // error
 			// also add to object, setting its parent
 			parent.Objects().Append(manifold.FromEntity(nn)) // todo: avoid FromEntity?
 
@@ -162,25 +161,25 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 			parent.SetAttr("view", oldView) // error
 		},
 		Cancel: func() {
-			entity.Destroy(n)               // error
+			node.Destroy(n)               // error
 			parent.SetAttr("view", oldView) // error
 
 		},
 	}
 	// todo: errors
 	n.AddComponent(com)
-	entity.SetStore(n, entity.GetStore(parent))
+	node.SetStore(n, node.GetStore(parent))
 	parent.Objects().Append(n)
 	parent.SetAttr("view", "objects")
 	return n
 }
 
 // for use in components implementing Nodes()
-func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes entity.Nodes) {
+func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes node.Nodes) {
 	resources, err := lister.List(context.Background())
 	if err != nil {
 		log.Println(err)
-		return entity.Nodes{}
+		return node.Nodes{}
 	}
 	// iterate over existing resources
 	for idx, newres := range resources {
@@ -193,8 +192,8 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes entity.Nodes) 
 			r.SetSync(&v)
 			r.CheckSync()
 			nn := manifold.FromEntity(node.New(
-				entity.Name(r.Latest),
-				node.Attrs{
+				node.Name(r.Latest),
+				node.Attributes{
 					"view":      "fields",
 					"desc":      string(r.ID),
 					"deletable": "",
@@ -202,7 +201,7 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes entity.Nodes) 
 				r,
 				&v,
 			))
-			entity.SetStore(nn, entity.GetStore(com)) // hmmm
+			node.SetStore(nn, node.GetStore(com)) // hmmm
 			com.Objects().Append(nn)
 			continue
 		}
@@ -225,7 +224,7 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes entity.Nodes) 
 		// if not found, remove the node
 		if !found {
 			log.Println("not in resources, removing")
-			entity.Destroy(e) //error
+			node.Destroy(e) //error
 			continue
 		}
 

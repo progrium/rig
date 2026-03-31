@@ -4,7 +4,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/signal"
 	"github.com/rs/xid"
 )
@@ -42,12 +41,12 @@ type Raw struct {
 
 	N uint
 
-	store entity.Store
+	store Store
 	root  *Raw
 	mu    sync.Mutex
 	// err   error
 
-	signal.Dispatcher[entity.E]
+	signal.Dispatcher[E]
 }
 
 func NewRaw(name string, value any, id string) *Raw {

@@ -16,7 +16,7 @@ type BarCom struct {
 
 func TestNode(t *testing.T) {
 	n := FromEntity(node.New("root",
-		node.Attrs{
+		node.Attributes{
 			"foo": "bar",
 		},
 		node.Children{

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/progrium/rig/pkg/debouncer"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/signal"
@@ -15,7 +14,7 @@ var SaveDebounceDuration = 500 * time.Millisecond
 
 type M struct {
 	name     string
-	store    *node.Store
+	store    *node.MemStore
 	provider Provider
 	debounce func(func())
 }
@@ -78,8 +77,8 @@ func (m *M) Save() error {
 	return m.provider.SaveAll(nodes)
 }
 
-func (m *M) Signaled(s signal.Signal[entity.E]) {
-	// e := s.Receiver.(entity.E)
+func (m *M) Signaled(s signal.Signal[node.E]) {
+	// e := s.Receiver.(node.E)
 	// log.Println("event:", s.Name, e.GetName(), s.Args)
 	m.debounce(func() {
 		// if err := m.Save(); err != nil {

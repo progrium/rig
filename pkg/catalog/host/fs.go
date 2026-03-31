@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 )
@@ -32,19 +31,19 @@ type Directory struct {
 }
 
 func dirNode(name, path string) *node.Raw {
-	return node.New(name, node.Attrs{
+	return node.New(name, node.Attributes{
 		"desc": " ",
 		"view": "host.Directory",
 	}, &Directory{Path: path})
 }
 
 func fileNode(name, path string) *node.Raw {
-	return node.New(name, node.Attrs{
+	return node.New(name, node.Attributes{
 		"icon": "symbol-file",
 	}, &File{Path: path})
 }
 
-func (d *Directory) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (d *Directory) Nodes(com manifold.Node) (nodes node.Nodes) {
 	entries, err := fs.ReadDir(os.DirFS(d.Path), ".")
 	if err != nil {
 		log.Println(err)

@@ -1,14 +1,10 @@
 package node
 
-import (
-	"github.com/progrium/rig/pkg/entity"
-)
-
-func (r *Raw) Entity() entity.E {
+func (r *Raw) Entity() E {
 	return r
 }
 
-func (r *Raw) SetStore(s entity.Store) error {
+func (r *Raw) SetStore(s Store) error {
 	if s == nil {
 		return nil
 	}
@@ -16,7 +12,7 @@ func (r *Raw) SetStore(s entity.Store) error {
 	return s.Store(r)
 }
 
-func (r *Raw) GetStore() entity.Store {
+func (r *Raw) GetStore() Store {
 	if r.store != nil {
 		return r.store
 	}
@@ -26,7 +22,7 @@ func (r *Raw) GetStore() entity.Store {
 			root = root.root
 		}
 		if root != nil {
-			return entity.GetStore(root)
+			return GetStore(root)
 		}
 	}
 	// we're root with no store
@@ -114,8 +110,8 @@ func (r *Raw) GetParentID() string {
 	return r.Parent
 }
 
-func (r *Raw) GetParent() entity.E {
-	store := entity.GetStore(r)
+func (r *Raw) GetParent() E {
+	store := GetStore(r)
 	if store == nil {
 		panic("store not set on entity")
 	}
@@ -148,8 +144,8 @@ func (r *Raw) nodes(kind string) *[]string {
 	}
 }
 
-func (r *Raw) GetEntities(kind string) (ents []entity.E) {
-	store := entity.GetStore(r)
+func (r *Raw) GetEntities(kind string) (ents []E) {
+	store := GetStore(r)
 	if store == nil {
 		panic("store not set on entity")
 	}
@@ -177,7 +173,7 @@ func (r *Raw) GetEntityIndexOf(kind, id string) (int, bool) {
 }
 
 func (r *Raw) AppendEntity(kind, id string) error {
-	store := entity.GetStore(r)
+	store := GetStore(r)
 	r.mu.Lock()
 	nodes := r.nodes(kind)
 	*nodes = append(*nodes, id)
@@ -185,7 +181,7 @@ func (r *Raw) AppendEntity(kind, id string) error {
 	r.mu.Unlock()
 	if store != nil {
 		ent := store.Resolve(id)
-		return entity.SetParent(ent, r.ID)
+		return SetParent(ent, r.ID)
 	}
 	return nil
 }

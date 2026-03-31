@@ -6,7 +6,6 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/resource"
@@ -14,7 +13,7 @@ import (
 
 type Room livekit.Room
 
-func (r Room) Entity() entity.E {
+func (r Room) Entity() node.E {
 	return r
 }
 
@@ -91,7 +90,7 @@ func (l *RoomList) AddNode(typ string, parent manifold.Node, oldView string) (bo
 	return false, nil
 }
 
-func (l *RoomList) Nodes(com manifold.Node) (nodes entity.Nodes) {
+func (l *RoomList) Nodes(com manifold.Node) (nodes node.Nodes) {
 	nodes = resource.ListNodes(com, l.Provider.RoomProvider())
 	for _, n := range nodes {
 		nn := manifold.FromEntity(n)

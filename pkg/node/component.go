@@ -5,13 +5,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/library"
 	"tractor.dev/toolkit-go/duplex/fn"
 )
 
 type ComponentAttacher interface {
-	ComponentAttached(com entity.Node)
+	ComponentAttached(com Node)
 }
 
 func NewComponent(value any) *Raw {
@@ -37,11 +36,11 @@ func NewComponent(value any) *Raw {
 
 // func GetComponent[T any](n any) *T {
 // 	// check value first in case this is a component node
-// 	if v, ok := entity.Value(n).(*T); ok {
+// 	if v, ok := Value(n).(*T); ok {
 // 		return v
 // 	}
-// 	for _, c := range entity.Entities(n, Component) {
-// 		if v, ok := entity.Value(c).(*T); ok {
+// 	for _, c := range Entities(n, Component) {
+// 		if v, ok := Value(c).(*T); ok {
 // 			return v
 // 		}
 // 	}
@@ -49,9 +48,9 @@ func NewComponent(value any) *Raw {
 // }
 
 // func GetComponentInChildren[T any](n any) (c *T) {
-// 	for _, child := range entity.Entities(n, Object) {
-// 		for _, com := range entity.Entities(child, Component) {
-// 			if v, ok := entity.Value(com).(*T); ok {
+// 	for _, child := range Entities(n, Object) {
+// 		for _, com := range Entities(child, Component) {
+// 			if v, ok := Value(com).(*T); ok {
 // 				return v
 // 			}
 // 		}
@@ -60,8 +59,8 @@ func NewComponent(value any) *Raw {
 // }
 
 // func GetComponents[T any](n any) (c []*T) {
-// 	for _, com := range entity.Entities(n, Component) {
-// 		if v, ok := entity.Value(com).(*T); ok {
+// 	for _, com := range Entities(n, Component) {
+// 		if v, ok := Value(com).(*T); ok {
 // 			c = append(c, v)
 // 		}
 // 	}
@@ -69,9 +68,9 @@ func NewComponent(value any) *Raw {
 // }
 
 // func GetComponentsInChildren[T any](n any) (c []*T) {
-// 	for _, child := range entity.Entities(n, Object) {
-// 		for _, com := range entity.Entities(child, Component) {
-// 			if v, ok := entity.Value(com).(*T); ok {
+// 	for _, child := range Entities(n, Object) {
+// 		for _, com := range Entities(child, Component) {
+// 			if v, ok := Value(com).(*T); ok {
 // 				c = append(c, v)
 // 			}
 // 		}
@@ -79,7 +78,7 @@ func NewComponent(value any) *Raw {
 // 	return
 // }
 
-func GetComponent[T any](n any, includes ...Include) (e entity.E, c T) {
+func GetComponent[T any](n any, includes ...Include) (e E, c T) {
 	ee, cc := GetAllComponents[T](n, includes...)
 	if len(ee) > 0 {
 		return ee[0], cc[0]
@@ -95,12 +94,12 @@ func Get[T any](n any, includes ...Include) (c T) {
 	return
 }
 
-func getAll[T any](n any, includeDisabled bool) (e []entity.E, c []T) {
-	for _, com := range entity.Entities(n, Component) {
-		if !entity.ComponentEnabled(com) && !includeDisabled {
+func getAll[T any](n any, includeDisabled bool) (e []E, c []T) {
+	for _, com := range Entities(n, Component) {
+		if !ComponentEnabled(com) && !includeDisabled {
 			continue
 		}
-		if v, ok := entity.Value(com).(T); ok {
+		if v, ok := Value(com).(T); ok {
 			c = append(c, v)
 			e = append(e, com)
 		}
@@ -113,7 +112,7 @@ func GetAll[T any](n any, includes ...Include) (c []T) {
 	return
 }
 
-func GetAllComponents[T any](n any, includes ...Include) (e []entity.E, c []T) {
+func GetAllComponents[T any](n any, includes ...Include) (e []E, c []T) {
 	include := mergeIncludes(includes)
 	if !include.NotSelf {
 		ee, cc := getAll[T](n, include.Disabled)
@@ -121,12 +120,12 @@ func GetAllComponents[T any](n any, includes ...Include) (e []entity.E, c []T) {
 		e = append(e, ee...)
 	}
 	if include.Siblings {
-		if p := entity.Parent(n); IsComponent(n) && p != nil {
+		if p := Parent(n); IsComponent(n) && p != nil {
 			ee, cc := getAll[T](p, include.Disabled)
 			c = append(c, cc...)
 			e = append(e, ee...)
 		} else {
-			for _, sibling := range entity.Siblings(n) {
+			for _, sibling := range Siblings(n) {
 				ee, cc := getAll[T](sibling, include.Disabled)
 				c = append(c, cc...)
 				e = append(e, ee...)
@@ -134,14 +133,14 @@ func GetAllComponents[T any](n any, includes ...Include) (e []entity.E, c []T) {
 		}
 	}
 	if include.Parents {
-		for _, parent := range entity.Parents(n) {
+		for _, parent := range Parents(n) {
 			ee, cc := getAll[T](parent, include.Disabled)
 			c = append(c, cc...)
 			e = append(e, ee...)
 		}
 	}
 	if include.Children && !include.Descendants {
-		for _, child := range entity.Entities(n, Object) {
+		for _, child := range Entities(n, Object) {
 			ee, cc := getAll[T](child, include.Disabled)
 			c = append(c, cc...)
 			e = append(e, ee...)
@@ -153,8 +152,8 @@ func GetAllComponents[T any](n any, includes ...Include) (e []entity.E, c []T) {
 	return
 }
 
-func getFromDescendants[T any](n any, e *[]entity.E, c *[]T, includeDisabled bool) {
-	for _, child := range entity.Entities(n, Object) {
+func getFromDescendants[T any](n any, e *[]E, c *[]T, includeDisabled bool) {
+	for _, child := range Entities(n, Object) {
 		ee, cc := getAll[T](child, includeDisabled)
 		*c = append(*c, cc...)
 		*e = append(*e, ee...)
@@ -189,9 +188,9 @@ func zero[T any]() T {
 }
 
 // deprecated, use GetComponent
-func ComponentNode[T any](n any) (entity.E, T) {
-	for _, c := range entity.Entities(n, Component) {
-		if v, ok := entity.Value(c).(T); ok {
+func ComponentNode[T any](n any) (E, T) {
+	for _, c := range Entities(n, Component) {
+		if v, ok := Value(c).(T); ok {
 			return c, v
 		}
 	}
@@ -199,39 +198,39 @@ func ComponentNode[T any](n any) (entity.E, T) {
 }
 
 func EnableComponent(n any) error {
-	if entity.ComponentEnabled(n) {
+	if ComponentEnabled(n) {
 		return nil
 	}
-	rv := reflect.ValueOf(entity.Value(n))
+	rv := reflect.ValueOf(Value(n))
 	enableFn := rv.MethodByName("EnableComponent")
 	if enableFn.IsValid() {
 		_, err := fn.Call(enableFn, []any{})
 		if err != nil {
-			if e := entity.SetAttr(n, "error", err.Error()); e != nil {
+			if e := SetAttr(n, "error", err.Error()); e != nil {
 				panic(e)
 			}
 			return err
 		}
 	}
-	return entity.SetAttr(n, "enabled", "true")
+	return SetAttr(n, "enabled", "true")
 }
 
 func DisableComponent(n any) error {
-	if !entity.ComponentEnabled(n) {
+	if !ComponentEnabled(n) {
 		return nil
 	}
-	rv := reflect.ValueOf(entity.Value(n))
+	rv := reflect.ValueOf(Value(n))
 	if rv.IsValid() {
 		enableFn := rv.MethodByName("DisableComponent")
 		if enableFn.IsValid() {
 			_, err := fn.Call(enableFn, []any{})
 			if err != nil {
-				if e := entity.SetAttr(n, "error", err.Error()); e != nil {
+				if e := SetAttr(n, "error", err.Error()); e != nil {
 					panic(e)
 				}
 				return err
 			}
 		}
 	}
-	return entity.SetAttr(n, "enabled", "false")
+	return SetAttr(n, "enabled", "false")
 }

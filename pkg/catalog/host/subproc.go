@@ -39,7 +39,7 @@ func SubprocessNode(name string, cmd *exec.Cmd) *node.Raw {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	return node.New(name, node.Attrs{
+	return node.New(name, node.Attributes{
 		"enabled": "false",
 		"icon":    "circle-filled",
 		"color":   "",

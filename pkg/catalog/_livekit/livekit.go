@@ -19,7 +19,6 @@ import (
 
 	"github.com/progrium/rig/pkg/catalog/host"
 	"github.com/progrium/rig/pkg/catalog/obs"
-	"github.com/progrium/rig/pkg/entity"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/util"
@@ -152,7 +151,7 @@ type Provider struct {
 	participantProviders map[string]*participantProvider
 	chatRoom             *lksdk2.Room
 
-	com entity.Node
+	com node.Node
 }
 
 type Client struct {
@@ -164,7 +163,7 @@ func (c *Provider) Client() *Client {
 	return c.client
 }
 
-func (c *Provider) ComponentAttached(com entity.Node) {
+func (c *Provider) ComponentAttached(com node.Node) {
 	c.com = com
 }
 
@@ -233,7 +232,7 @@ func (c *Provider) onDataPacket(data lksdk2.DataPacket, params lksdk2.DataReceiv
 	}
 	log.Println("CHAT:", m["message"])
 	if video, ok := detectYouTubeURL(m["message"].(string)); ok {
-		client := node.Get[*obs.Client](entity.Root(c.com), node.Include{Children: true})
+		client := node.Get[*obs.Client](node.Root(c.com), node.Include{Children: true})
 		_, err := client.Inputs.SetInputSettings(&inputs.SetInputSettingsParams{
 			InputName: ptr("Browser"),
 			InputSettings: map[string]any{
@@ -305,11 +304,11 @@ func (c *Provider) ParticipantProvider(room string) *participantProvider {
 	return p
 }
 
-func (c *Provider) Nodes(com manifold.Node) entity.Nodes {
+func (c *Provider) Nodes(com manifold.Node) node.Nodes {
 	if c.client == nil {
-		return entity.Nodes{}
+		return node.Nodes{}
 	}
-	return entity.Nodes{
+	return node.Nodes{
 		node.NewID(path.Join(com.ID(), "rooms"), "Rooms", node.Attrs{"view": "livekit.RoomList"}, &RoomList{Provider: c}),
 		node.NewID(path.Join(com.ID(), "ingress"), "Ingress", node.Attrs{"view": "livekit.IngressList"}, &IngressList{Provider: c}),
 	}
@@ -325,9 +324,9 @@ func (c *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// TODO: route events!
 	// log.Println("livekit:", event)
 	if c.com != nil {
-		p := entity.Parent(c.com) // we're assuming node layout
+		p := node.Parent(c.com) // we're assuming node layout
 		if p != nil {
-			node.Send(p.(entity.Node), "livekit-event", nil)
+			node.Send(p.(node.Node), "livekit-event", nil)
 		}
 	}
 }

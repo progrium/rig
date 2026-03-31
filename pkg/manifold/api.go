@@ -3,14 +3,14 @@ package manifold
 import (
 	"context"
 
-	"github.com/progrium/rig/pkg/entity"
+	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/signal"
 )
 
-type Signal = signal.Signal[entity.E]
+type Signal = signal.Signal[node.E]
 
 func Receiver(s Signal) Node {
-	return FromEntity(entity.ToEntity(s.Receiver))
+	return FromEntity(node.ToEntity(s.Receiver))
 }
 
 type Bus interface {
@@ -44,9 +44,9 @@ type Bus interface {
 }
 
 type Node interface {
-	Entity() entity.E
+	Entity() node.E
 	Signaled(s Signal)
-	Store() entity.Store
+	Store() node.Store
 	// Bus() Bus
 
 	//RawRef() *node.Raw // copy, unless single threaded. always if remotenode
@@ -138,7 +138,7 @@ type Component struct {
 	com Node
 }
 
-func (embedder *Component) ComponentAttached(com entity.Node) {
+func (embedder *Component) ComponentAttached(com node.Node) {
 	embedder.com = FromEntity(com)
 }
 
@@ -147,7 +147,7 @@ func (embedder *Component) Node() Node {
 }
 
 func (embedder *Component) Object() Node {
-	return FromEntity(entity.Parent(embedder.com))
+	return FromEntity(node.Parent(embedder.com))
 }
 
 func Equal(a, b Node) bool {

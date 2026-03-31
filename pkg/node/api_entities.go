@@ -1,4 +1,4 @@
-package entity
+package node
 
 import "errors"
 
@@ -34,7 +34,6 @@ func EntityCount(v any, kind string) int {
 		if ee, ok := e.(EntityCountEntity); ok {
 			return ee.GetEntityCount(kind)
 		}
-		// fallback
 		return len(Entities(v, kind))
 	}
 	return 0
@@ -51,7 +50,6 @@ func AppendEntity(v any, kind, id string) error {
 			return ee.AppendEntity(kind, id)
 		}
 	}
-	// todo: fallback to insertat -1
 	return errors.ErrUnsupported
 }
 
@@ -80,7 +78,6 @@ func RemoveEntity(v any, kind, id string) error {
 			return ee.RemoveEntity(kind, id)
 		}
 	}
-	// todo: fallback to indexof + removeat
 	return errors.ErrUnsupported
 }
 
@@ -109,6 +106,5 @@ func MoveEntity(v any, kind string, idx, to int) error {
 			return ee.MoveEntity(kind, idx, to)
 		}
 	}
-	// todo: fallback to manual move
 	return errors.ErrUnsupported
 }

@@ -14,8 +14,8 @@ type ComponentA struct {
 
 func TestObject(t *testing.T) {
 	obj := node.New("demo", ComponentA{FieldA: "Foo"}, node.Children{
-		node.New("sub1", node.Attrs{"foo": "bar"}),
-		node.New("sub2", node.Attrs{"foo": "bar"}, node.Children{
+		node.New("sub1", node.Attributes{"foo": "bar"}),
+		node.New("sub2", node.Attributes{"foo": "bar"}, node.Children{
 			node.New("subsub"),
 		}),
 	})

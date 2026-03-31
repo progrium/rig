@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/progrium/rig/pkg/entity"
-	"github.com/progrium/rig/pkg/inspector"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/misc"
 	"github.com/progrium/rig/pkg/module"
@@ -78,7 +76,7 @@ func Run(mainFacets ...any) {
 	handleProcSignals(mod)
 
 	bridge := &VSCodeBridge{}
-	inspector := inspector.Server{}
+	inspector := Inspector{}
 	super := node.New(node.RootID, bridge, inspector)
 	if err := mod.Main().Store().Store(super); err != nil {
 		log.Fatal(err)
@@ -137,9 +135,9 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 	}
 	defer listener.Close()
 
-	var watcher signals.Watcher[entity.E]
-	if s := entity.GetStore(mod.Main().Entity()); s != nil {
-		if sw, ok := s.(signals.Watcher[entity.E]); ok {
+	var watcher signals.Watcher[node.E]
+	if s := node.GetStore(mod.Main().Entity()); s != nil {
+		if sw, ok := s.(signals.Watcher[node.E]); ok {
 			watcher = sw
 		}
 	}
@@ -199,8 +197,8 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 				// latest connection takes over bridge
 				bridge.Peer = peer
 
-				signaler := signals.Func[entity.E](func(s node.Signal) {
-					e := s.Receiver.(entity.E)
+				signaler := signals.Func[node.E](func(s node.Signal) {
+					e := s.Receiver.(node.E)
 					// log.Println("signal:", s.Name, e.GetName(), s.Args)
 					if _, err := peer.Call(context.TODO(), "signaled", fn.Args{e.GetID()}, nil); err != nil {
 						if err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {

@@ -1,0 +1,18 @@
+hr { 
+    border: 0; 
+    border-top: 1px solid lightgray; 
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.name { 
+    font-size: 1.5em; 
+    font-weight: bold; 
+}
+
+.id { 
+    font-size: 1em; 
+    color: gray; 
+}
+
+.value {  }

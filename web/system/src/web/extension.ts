@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// wanix port -> bridge port -> message passing port
 	port.postMessage({type: "_port", port: channel.port1}, [channel.port1]);
 
-	bridge.ready.then((wfsys) => {
+	bridge.ready.then(async (wfsys) => {
 
 		vscode.commands.registerCommand('rig.createTerminal', async () => {
 			const term = vscode.window.createTerminal({ name: 'Shell', pty: await createTerminal(wfsys)});

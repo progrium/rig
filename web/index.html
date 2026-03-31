@@ -53,7 +53,7 @@
 
         const token = document.cookie.split("; ").find(row => row.startsWith("token=")).split("=")[1];
         const baseURL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
-        const ws = new WebSocket(`${baseURL}/${token}`);
+        const ws = new WebSocket(`${baseURL}/fsys/${token}`);
         ws.onopen = async () => {
             const workbench = document.querySelector('rig-workbench');
             workbench.load(() => websocketToMessagePort(ws));

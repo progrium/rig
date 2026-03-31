@@ -15,8 +15,7 @@ import (
 	"unicode"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/progrium/rig/pkg/entity"
-	"github.com/progrium/rig/pkg/inspector/field"
+	"github.com/progrium/rig/pkg/field"
 	"github.com/progrium/rig/pkg/manifold"
 	"github.com/progrium/rig/pkg/meta"
 	"github.com/progrium/rig/pkg/node"
@@ -26,7 +25,7 @@ import (
 )
 
 type NodeProvider interface {
-	Nodes(parent manifold.Node) entity.Nodes
+	Nodes(parent manifold.Node) node.Nodes
 }
 
 type NodeToggler interface {
@@ -379,7 +378,7 @@ func (t *Workbench) findNode(id string) manifold.Node {
 	if id == "" {
 		return manifold.FromEntity(t.root)
 	}
-	return manifold.FromEntity(entity.GetStore(t.root).Resolve(id))
+	return manifold.FromEntity(node.GetStore(t.root).Resolve(id))
 }
 
 func (t *Workbench) Toggle(id string, state bool) error {
@@ -478,7 +477,7 @@ func (t *Workbench) EditField(id string, val any) error {
 	if err := cur.Set(val); err != nil {
 		return err
 	}
-	entity.Send(n, "")
+	node.Send(n, "")
 	return nil
 }
 
@@ -490,7 +489,7 @@ func (t *Workbench) Delete(id string) error {
 	for _, deleter := range node.GetAll[NodeDeleter](n) {
 		deleter.Delete(n)
 	}
-	return entity.Destroy(n)
+	return node.Destroy(n)
 }
 
 func (t *Workbench) Views(id string) (views []string) {
@@ -525,7 +524,7 @@ func isValidStructPtr(rv reflect.Value) bool {
 	return rv.Type().Kind() == reflect.Ptr && !rv.IsNil() && rv.Type().Elem().Kind() == reflect.Struct
 }
 
-func (t *Workbench) structFields(store entity.Store, parentID string, rv reflect.Value) (items node.Children) {
+func (t *Workbench) structFields(store node.Store, parentID string, rv reflect.Value) (items node.Children) {
 	rv = reflect.Indirect(rv)
 	for i := 0; i < rv.Type().NumField(); i++ {
 		f := rv.Type().Field(i)
@@ -541,18 +540,18 @@ func (t *Workbench) structFields(store entity.Store, parentID string, rv reflect
 			strings.Count(id, "/") < 3 {
 			children = t.structFields(store, id, fv)
 		}
-		attrs := node.Attrs{
+		attrs := node.Attributes{
 			"desc":  fmt.Sprintf("%#v", fv.Interface()),
 			"field": "",
 		}
 		if fv.IsValid() && f.Type.Kind() == reflect.Func && f.Type.NumIn() == 0 {
-			attrs = node.Attrs{
+			attrs = node.Attributes{
 				"callable": "",
 				"icon":     "zap",
 			}
 		}
 		n := node.NewID(id, f.Name, attrs, children)
-		if err := entity.SetStore(n, store); err != nil {
+		if err := node.SetStore(n, store); err != nil {
 			log.Println(err)
 		}
 		items = append(items, n)
@@ -565,9 +564,9 @@ func (t *Workbench) valueFields(n manifold.Node) (items []treeItem) {
 	if rv.IsNil() {
 		return
 	}
-	store := entity.GetStore(n)
+	store := node.GetStore(n)
 	for _, child := range t.structFields(store, n.ID(), rv) {
-		entity.SetParent(child, n.ID())
+		node.SetParent(child, n.ID())
 		items = append(items, t.nodeItem(manifold.FromEntity(child)))
 	}
 	return
@@ -596,7 +595,7 @@ func (t *Workbench) AddItem(id, typ, name string) error {
 			return err
 		}
 		newnode = v[0].(*node.Raw)
-		if err := entity.SetName(newnode, name); err != nil {
+		if err := node.SetName(newnode, name); err != nil {
 			return err
 		}
 	}
@@ -765,14 +764,14 @@ func ProvidedNodes(n manifold.Node) (nodes []manifold.Node) {
 	if !ok {
 		return
 	}
-	store := entity.GetStore(n)
+	store := node.GetStore(n)
 	for _, pn := range np.Nodes(n) {
 		nn := store.Resolve(pn.Entity().GetID())
 		if nn == nil {
-			if err := entity.SetStore(pn, store); err != nil {
+			if err := node.SetStore(pn, store); err != nil {
 				log.Println(err)
 			}
-			if err := entity.SetParent(pn, n.ID()); err != nil {
+			if err := node.SetParent(pn, n.ID()); err != nil {
 				log.Println(err)
 			}
 			nn = pn.Entity()
@@ -833,7 +832,7 @@ func (t *Workbench) nodeItem(n manifold.Node) treeItem {
 	if n.Kind() == node.Component {
 		item.Description = n.ComponentType()
 		checkState := 0
-		if entity.ComponentEnabled(n) {
+		if node.ComponentEnabled(n) {
 			checkState = 1
 		}
 		item.CheckboxState = &checkState
@@ -854,7 +853,7 @@ func (t *Workbench) nodeItem(n manifold.Node) treeItem {
 		contextValues = append(contextValues, "addable")
 	}
 	item.ContextValue = strings.Join(contextValues, ",")
-	item.Attrs = entity.AttrMap(n)
+	item.Attrs = node.AttrMap(n)
 	item.Tooltip = fmt.Sprintf("%s\n---\n* ID: %s\n* View: %s\n* Kind: %s", n.Name(), n.ID(), n.Attr("view"), n.Kind())
 	if n.Error() != nil {
 		item.Tooltip = fmt.Sprintf("%s\n---\nError: %s", n.Name(), n.Error())

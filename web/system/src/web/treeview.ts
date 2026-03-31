@@ -2,8 +2,8 @@
 import * as vscode from 'vscode';
 import * as duplex from "@progrium/duplex";
 
-import { TempFileSystemProvider } from './bufferfs';
-import { InspectorViewProvider } from './inspector';
+import { TempFileSystemProvider } from './bufferfs.js';
+import { InspectorViewProvider } from './inspector.js';
 
 var peer: duplex.Peer;
 
@@ -65,7 +65,8 @@ export async function activate(context: vscode.ExtensionContext, fsys: any) {
     peer.call("session", []);
     // startOutput(logs, peer);
 
-    inspector = new InspectorViewProvider(context.extensionUri, "http://localhost:8080/-/inspector/inspector.html", peer);
+    const token = (await fsys.readText("root/etc/token")).trim();
+    inspector = new InspectorViewProvider(context.extensionUri, "ws://localhost:8080/inspector/"+token, peer);
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(InspectorViewProvider.viewType, inspector));
     context.subscriptions.push(

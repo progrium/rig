@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/mux"
 	"tractor.dev/toolkit-go/engine/cli"
+	"tractor.dev/toolkit-go/engine/fs"
 	"tractor.dev/wanix"
 	"tractor.dev/wanix/fs/localfs"
 	"tractor.dev/wanix/term"
@@ -61,21 +62,25 @@ func serve(ctx *cli.Context, args []string) {
 	root.Namespace().Bind(lfsys, ".", "root")
 
 	token := uuid.New().String()
+	if err := fs.WriteFile(lfsys, "etc/token", []byte(token+"\n"), 0644); err != nil {
+		log.Fatal(err)
+	}
 	fs := http.FileServerFS(web.FS)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/"+token {
-			websocket.Handler(func(ws *websocket.Conn) {
-				ws.PayloadType = websocket.BinaryFrame
-				sess := mux.New(ws)
-				defer sess.Close()
-				api.PortResponder(sess, root)
-			}).ServeHTTP(w, r)
-			return
-		}
 		if r.URL.Path == "/" {
 			w.Header().Set("Set-Cookie", fmt.Sprintf("token=%s", token))
 		}
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fs.ServeHTTP(w, r)
+	})
+
+	http.HandleFunc(fmt.Sprintf("/fsys/%s", token), func(w http.ResponseWriter, r *http.Request) {
+		websocket.Handler(func(ws *websocket.Conn) {
+			ws.PayloadType = websocket.BinaryFrame
+			sess := mux.New(ws)
+			defer sess.Close()
+			api.PortResponder(sess, root)
+		}).ServeHTTP(w, r)
 	})
 
 	inspectorTarget, err := url.Parse("http://localhost:11010")
@@ -86,7 +91,7 @@ func serve(ctx *cli.Context, args []string) {
 	inspectorProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		http.Error(w, "proxy connection error", http.StatusBadGateway)
 	}
-	http.Handle("/-/inspector/", inspectorProxy)
+	http.Handle(fmt.Sprintf("/inspector/%s", token), inspectorProxy)
 
 	go setupManifold()
 

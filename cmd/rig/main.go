@@ -113,11 +113,12 @@ import (
 	"log"
 
 	"github.com/progrium/rig/pkg/runtime"
+	"github.com/progrium/rig/pkg/catalog/debug"
 )
 
 func main() {
 	log.Println("started")
-	runtime.Run()
+	runtime.Run(debug.Debug{})
 }
 `
 	os.MkdirAll(srcPath, 0755)

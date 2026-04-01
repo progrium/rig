@@ -45,8 +45,8 @@ export const Inspector = {
     };
     return (
       <div style={{margin: "10px", marginTop: "0px", marginLeft: "20px"}}>
-        <div class="name">{subject.name}</div>
         <div class="id">{subject.id}</div>
+        <div class="name">{subject.name}</div>
         <hr />
         <div class="value">
         {(subject.isComponent)

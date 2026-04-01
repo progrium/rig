@@ -11,8 +11,9 @@ hr {
 }
 
 .id { 
-    font-size: 1em; 
-    color: gray; 
+    font-size: 0.75em; 
+    color: gray;
+    text-transform: uppercase; 
 }
 
 .value {  }

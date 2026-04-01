@@ -28,6 +28,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			context.subscriptions.push(term);
 			term.show();
 		});
+
 		vscode.commands.executeCommand(`rig.createTerminal`);
 		
 		activateTreeview(context, wfsys);

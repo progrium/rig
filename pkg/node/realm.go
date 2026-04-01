@@ -16,51 +16,59 @@ import (
 	"github.com/progrium/rig/pkg/telepath"
 )
 
-type Store interface {
-	Resolve(id string, skip ...any) E
-	Store(e E) error
-	Destroy(e E) error
+// Realm is a node registry: resolve by id, persist nodes into the realm, and tear them down.
+// Implementations are expected to keep ids consistent with Node.NodeID.
+type Realm interface {
+	// Resolve returns the node for id, or nil if unknown. skip is reserved for future use.
+	Resolve(id string, skip ...any) Node
+	// Store registers n in the realm (typically a *Raw) and wires it for lookup and lifecycle.
+	Store(n Node) error
+	// Destroy removes n from the realm and releases associated resources.
+	Destroy(n Node) error
 }
 
-type StoreEntity interface {
-	E
-	SetStore(s Store) error
-	GetStore() Store
+// RealmNode is implemented by nodes that belong to a Realm (lookup, store, destroy).
+type RealmNode interface {
+	Node
+	SetRealm(s Realm) error
+	GetRealm() Realm
 }
 
-func SetStore(v any, s Store) error {
-	if e := ToEntity(v); e != nil {
-		if se, ok := e.(StoreEntity); ok {
-			return se.SetStore(s)
-		}
+// SetRealm attaches realm s to n when n implements RealmNode; otherwise returns errors.ErrUnsupported.
+func SetRealm(n Node, s Realm) error {
+	if rn, ok := Unwrap[RealmNode](n); ok {
+		return rn.SetRealm(s)
 	}
 	return errors.ErrUnsupported
 }
 
-func GetStore(v any) Store {
-	if e := ToEntity(v); e != nil {
-		if se, ok := e.(StoreEntity); ok {
-			return se.GetStore()
-		}
+// GetRealm returns n's realm when n implements RealmNode; otherwise nil.
+func GetRealm(n Node) Realm {
+	if rn, ok := Unwrap[RealmNode](n); ok {
+		return rn.GetRealm()
 	}
 	return nil
 }
 
-type MemStore struct {
+// BasicRealm is an in-memory Realm backed by a map of node id to *Raw.
+// It embeds signal.Dispatcher[Node] so stored nodes can participate in signaling.
+// The mutex protects the nodes map; callers should not mutate the map directly.
+type BasicRealm struct {
 	nodes map[string]*Raw
 	mu    sync.Mutex
 
-	signal.Dispatcher[E]
+	signal.Dispatcher[Node]
 }
 
-func NewStore() *MemStore {
-	return &MemStore{
+// NewStore returns an empty BasicRealm ready for Store.
+func NewStore() *BasicRealm {
+	return &BasicRealm{
 		nodes: make(map[string]*Raw),
 	}
 }
 
-func EmbeddedStore(n *Raw) *MemStore {
-	return &MemStore{
+func embeddedStore(n *Raw) *BasicRealm {
+	return &BasicRealm{
 		nodes: n.Embedded,
 	}
 }
@@ -78,17 +86,17 @@ func EmbeddedStore(n *Raw) *MemStore {
 // 	s.Dispatcher.Unwatch(n)
 // }
 
-func (s *MemStore) Destroy(e E) error {
+func (s *BasicRealm) Destroy(n Node) error {
 	// TODO: walk and destroy linked
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer Send(e, "")
-	delete(s.nodes, e.GetID())
+	defer Send(n, "")
+	delete(s.nodes, n.NodeID())
 	return nil
 }
 
-func (s *MemStore) Store(e E) error {
-	if r, ok := e.(*Raw); ok {
+func (s *BasicRealm) Store(n Node) error {
+	if r, ok := Unwrap[*Raw](n); ok {
 		r.mu.Lock()
 		s.mu.Lock()
 
@@ -96,7 +104,7 @@ func (s *MemStore) Store(e E) error {
 		if len(r.Embedded) > 0 {
 			for _, embed := range r.Embedded {
 				embed.root = nil // todo: is this necessary?
-				embed.store = s
+				embed.realm = s
 				s.nodes[embed.ID] = embed
 				defer Send(embed, "")
 			}
@@ -105,18 +113,18 @@ func (s *MemStore) Store(e E) error {
 		// r.Embedded = nil
 		r.root = nil // why?
 
-		r.store = s
+		r.realm = s
 		s.nodes[r.ID] = r
 
 		s.mu.Unlock()
 		r.mu.Unlock()
-		Send(e, "")
+		Send(n, "")
 		return nil
 	}
-	return fmt.Errorf("unable to store entity: %v", e)
+	return fmt.Errorf("unable to store node: %v", n.NodeID())
 }
 
-func (s *MemStore) Resolve(id string, skip ...any) E {
+func (s *BasicRealm) Resolve(id string, skip ...any) Node {
 	// TODO: resolver
 	s.mu.Lock()
 	n, ok := s.nodes[id]
@@ -127,7 +135,7 @@ func (s *MemStore) Resolve(id string, skip ...any) E {
 	return n
 }
 
-func (s *MemStore) Export() (data []Raw, err error) {
+func (s *BasicRealm) Export() (data []Raw, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -167,7 +175,7 @@ type valuePtr struct {
 	dst  string
 }
 
-func (s *MemStore) Import(data []Raw) error {
+func (s *BasicRealm) Import(data []Raw) error {
 	var ptrs []valuePtr
 	var loaded []*Raw
 	for _, d := range data {
@@ -213,13 +221,13 @@ func (s *MemStore) Import(data []Raw) error {
 	return nil
 }
 
-func (s *MemStore) FindValue(v any) (found *Raw, ok bool) {
+func (s *BasicRealm) FindValue(v any) (found *Raw, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.findValue(v)
 }
 
-func (s *MemStore) findValue(v any) (found *Raw, ok bool) {
+func (s *BasicRealm) findValue(v any) (found *Raw, ok bool) {
 	for _, n := range s.nodes {
 		if n.Value == nil || reflect.TypeOf(n.Value).Kind() == reflect.Map {
 			// otherwise un-inflated map[str]any values will be
@@ -262,7 +270,7 @@ func loadNode(data any) (*Raw, error) {
 		if raw.Component != "" {
 			raw.Attrs["error"] = fmt.Sprintf("unable to load component: %s", raw.Component)
 			raw.Value = nil
-			if err := DisableComponent(raw); err != nil {
+			if err := DisableComponent(&raw); err != nil {
 				panic(err)
 			}
 			return &raw, nil

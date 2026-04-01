@@ -3,138 +3,143 @@ package manifold
 import (
 	"reflect"
 
-	rig "github.com/progrium/rig/pkg/node"
+	node "github.com/progrium/rig/pkg/node"
 )
 
 type N struct {
-	e rig.E
+	n node.Node
 }
 
-func FromEntity(v any) *N {
-	return &N{e: rig.ToEntity(v)}
+func FromNode(n node.Node) *N {
+	return &N{n: n}
 }
 
-func (n *N) Entity() rig.E {
-	return n.e
+func (n *N) Node() node.Node {
+	return n.n
 }
 
-func (n *N) Store() rig.Store {
-	return rig.GetStore(n.e)
+func (n *N) Realm() node.Realm {
+	return node.GetRealm(n.n)
 }
 
 func (n *N) Signaled(s Signal) {
-	rig.Signaled(n.e, s)
+	node.Signaled(n.n, s)
 }
 
+func (n *N) NodeID() string {
+	return n.n.NodeID()
+}
+
+// TODO: deprecated?
 func (n *N) ID() string {
-	return n.e.GetID()
+	return n.n.NodeID()
 }
 
 func (n *N) Name() string {
-	return n.e.GetName()
+	return node.Name(n.n)
 }
 
 func (n *N) Kind() string {
-	return rig.Kind(n)
+	return node.Kind(n.n)
 }
 
 func (n *N) ComponentType() string {
-	return rig.ComponentType(n)
+	return node.ComponentType(n.n)
 }
 
 func (n *N) Value() any {
-	return rig.Value(n)
+	return node.Value(n.n)
 }
 
 func (n *N) Attrs() []string {
-	return rig.Attrs(n)
+	return node.Attrs(n.n)
 }
 
 func (n *N) HasAttr(key string) bool {
-	return rig.HasAttr(n, key)
+	return node.HasAttr(n.n, key)
 }
 
 func (n *N) Attr(key string) string {
-	return rig.Attr(n, key)
+	return node.Attr(n.n, key)
 }
 
 func (n *N) Parent() Node {
-	return FromEntity(rig.Parent(n))
+	return FromNode(node.Parent(n.n))
 }
 
 func (n *N) Components() List {
-	return L{node: n, kind: rig.Component}
+	return L{node: n, kind: node.TypeComponent}
 }
 
 func (n *N) AddComponent(v any) (Node, error) {
-	var com *rig.Raw
-	if r, ok := v.(*rig.Raw); ok {
+	var com *node.Raw
+	if r, ok := v.(*node.Raw); ok {
 		com = r
 	} else {
-		com = rig.NewComponent(v)
+		com = node.NewComponent(v)
 	}
-	if err := rig.SetStore(com, rig.GetStore(n)); err != nil {
+	if err := node.SetRealm(com, node.GetRealm(n)); err != nil {
 		return nil, err
 	}
-	err := rig.AppendEntity(n, rig.Component, com.ID)
+	err := node.AppendSubnode(n, node.TypeComponent, com.ID)
 	if err != nil {
 		return nil, err
 	}
-	return FromEntity(com), nil
+	return FromNode(com), nil
 }
 
 func (n *N) Objects() List {
-	return L{node: n, kind: rig.Object}
+	return L{node: n, kind: node.TypeObject}
 }
 
 func (n *N) Duplicate() Node {
-	nn := rig.NewRaw(n.Name(), dupVal(n.Value()), "")
+	nn := node.NewRaw(n.Name(), dupVal(n.Value()), "")
 	nn.Kind = n.Kind()
-	rig.SetStore(nn, rig.GetStore(n))
+	node.SetRealm(nn, node.GetRealm(n))
 
 	for _, attr := range n.Attrs() {
-		rig.SetAttr(nn, attr, n.Attr(attr))
+		node.SetAttr(nn, attr, n.Attr(attr))
 	}
 
 	for _, c := range n.Components().Nodes() {
 		dup := c.Duplicate()
-		if err := rig.AppendEntity(nn, rig.Component, dup.ID()); err != nil {
+		if err := node.AppendSubnode(nn, node.TypeComponent, dup.ID()); err != nil {
 			panic(err)
 		}
 	}
 
 	for _, c := range n.Objects().Nodes() {
 		dup := c.Duplicate()
-		if err := rig.AppendEntity(nn, rig.Object, dup.ID()); err != nil {
+		if err := node.AppendSubnode(nn, node.TypeObject, dup.ID()); err != nil {
 			panic(err)
 		}
 	}
 
-	return FromEntity(nn)
+	return FromNode(nn)
 }
 
 func (n *N) SetName(name string) error {
-	return rig.SetName(n, name)
+	return node.SetName(n, name)
 }
 
 func (n *N) SetValue(v any) error {
-	return rig.SetValue(n, v)
+	return node.SetValue(n, v)
 }
 
 func (n *N) SetParent(p Node) error {
-	return rig.SetParent(n, p.ID())
+	return node.SetParent(n, p.ID())
 }
 
 func (n *N) SetAttr(key, val string) error {
-	return rig.SetAttr(n, key, val)
+	return node.SetAttr(n, key, val)
 }
 
 func (n *N) DelAttr(key string) error {
-	return rig.DelAttr(n, key)
+	return node.DelAttr(n, key)
 }
 
 func (n *N) Error() error {
-	return rig.Error(n)
+	return node.Error(n)
 }
 
 // DupVal uses reflection to duplicate a value

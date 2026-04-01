@@ -130,7 +130,7 @@ func (oa *ObjectActivator) DeactivateObject(ctx context.Context) error {
 
 func resolveComponentTypes(obj node.Node) (resolved []reflect.Type, missing []reflect.Type, err error) {
 	var rv []reflect.Type
-	for _, com := range node.Entities(obj, node.Component) {
+	for _, com := range node.Subnodes(obj, node.TypeComponent) {
 		if !node.ComponentEnabled(com) {
 			continue
 		}
@@ -145,7 +145,7 @@ func resolveComponentTypes(obj node.Node) (resolved []reflect.Type, missing []re
 }
 
 func componentFromType(obj node.Node, t reflect.Type) node.Node {
-	for _, com := range node.Entities(obj, node.Component) {
+	for _, com := range node.Subnodes(obj, node.TypeComponent) {
 		if !node.ComponentEnabled(com) {
 			continue
 		}

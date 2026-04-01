@@ -9,10 +9,32 @@ import (
 	"tractor.dev/toolkit-go/duplex/fn"
 )
 
+// ComponentAttacher is implemented by values that want notification when a component is attached.
 type ComponentAttacher interface {
 	ComponentAttached(com Node)
 }
 
+// ComponentEnabled reports whether n's "enabled" attribute is the string "true".
+func ComponentEnabled(n Node) bool {
+	return Attr(n, "enabled") == "true"
+}
+
+// ComponentEntity is implemented by nodes that expose a component type identifier (e.g. library path).
+type ComponentEntity interface {
+	GetComponentType() string
+}
+
+// ComponentType returns the component type string when n implements ComponentEntity; otherwise "".
+func ComponentType(n Node) string {
+	if ce, ok := Unwrap[ComponentEntity](n); ok {
+		return ce.GetComponentType()
+	}
+	return ""
+}
+
+// NewComponent builds a component Raw node from value: normalizes to a pointer, derives the
+// component id from library.ComponentID (stripping generic type parameters), sets kind TypeComponent,
+// and uses the path base of that id as the node name.
 func NewComponent(value any) *Raw {
 	// normalize value to a ptr
 	rv := reflect.ValueOf(value)
@@ -29,56 +51,58 @@ func NewComponent(value any) *Raw {
 		com = com[:idx]
 	}
 	n := NewRaw(path.Base(com), ptr.Interface(), "")
-	n.Kind = Component
+	n.Kind = TypeComponent
 	n.Component = com
 	return n
 }
 
-// func GetComponent[T any](n any) *T {
-// 	// check value first in case this is a component node
-// 	if v, ok := Value(n).(*T); ok {
-// 		return v
-// 	}
-// 	for _, c := range Entities(n, Component) {
-// 		if v, ok := Value(c).(*T); ok {
-// 			return v
-// 		}
-// 	}
-// 	return nil
-// }
+// EnableComponent turns the component on: no-op if already enabled. If the underlying value
+// has an EnableComponent method, it is invoked first; on error the error is stored on the node
+// and returned. On success (or no such method), sets attribute "enabled" to "true".
+func EnableComponent(n Node) error {
+	if ComponentEnabled(n) {
+		return nil
+	}
+	rv := reflect.ValueOf(Value(n))
+	enableFn := rv.MethodByName("EnableComponent")
+	if enableFn.IsValid() {
+		_, err := fn.Call(enableFn, []any{})
+		if err != nil {
+			if e := SetAttr(n, "error", err.Error()); e != nil {
+				panic(e)
+			}
+			return err
+		}
+	}
+	return SetAttr(n, "enabled", "true")
+}
 
-// func GetComponentInChildren[T any](n any) (c *T) {
-// 	for _, child := range Entities(n, Object) {
-// 		for _, com := range Entities(child, Component) {
-// 			if v, ok := Value(com).(*T); ok {
-// 				return v
-// 			}
-// 		}
-// 	}
-// 	return
-// }
+// DisableComponent turns the component off: no-op if already disabled. If the underlying value
+// has a DisableComponent method, it is invoked first; on error the error is stored on the node
+// and returned. On success (or no such method), sets attribute "enabled" to "false".
+func DisableComponent(n Node) error {
+	if !ComponentEnabled(n) {
+		return nil
+	}
+	rv := reflect.ValueOf(Value(n))
+	if rv.IsValid() {
+		enableFn := rv.MethodByName("DisableComponent")
+		if enableFn.IsValid() {
+			_, err := fn.Call(enableFn, []any{})
+			if err != nil {
+				if e := SetAttr(n, "error", err.Error()); e != nil {
+					panic(e)
+				}
+				return err
+			}
+		}
+	}
+	return SetAttr(n, "enabled", "false")
+}
 
-// func GetComponents[T any](n any) (c []*T) {
-// 	for _, com := range Entities(n, Component) {
-// 		if v, ok := Value(com).(*T); ok {
-// 			c = append(c, v)
-// 		}
-// 	}
-// 	return
-// }
+// TODO: clean all this up...
 
-// func GetComponentsInChildren[T any](n any) (c []*T) {
-// 	for _, child := range Entities(n, Object) {
-// 		for _, com := range Entities(child, Component) {
-// 			if v, ok := Value(com).(*T); ok {
-// 				c = append(c, v)
-// 			}
-// 		}
-// 	}
-// 	return
-// }
-
-func GetComponent[T any](n any, includes ...Include) (e E, c T) {
+func GetComponent[T any](n Node, includes ...Include) (e Node, c T) {
 	ee, cc := GetAllComponents[T](n, includes...)
 	if len(ee) > 0 {
 		return ee[0], cc[0]
@@ -86,7 +110,7 @@ func GetComponent[T any](n any, includes ...Include) (e E, c T) {
 	return
 }
 
-func Get[T any](n any, includes ...Include) (c T) {
+func Get[T any](n Node, includes ...Include) (c T) {
 	all := GetAll[T](n, includes...)
 	if len(all) > 0 {
 		return all[0]
@@ -94,8 +118,8 @@ func Get[T any](n any, includes ...Include) (c T) {
 	return
 }
 
-func getAll[T any](n any, includeDisabled bool) (e []E, c []T) {
-	for _, com := range Entities(n, Component) {
+func getAll[T any](n Node, includeDisabled bool) (e []Node, c []T) {
+	for _, com := range Subnodes(n, TypeComponent) {
 		if !ComponentEnabled(com) && !includeDisabled {
 			continue
 		}
@@ -107,12 +131,12 @@ func getAll[T any](n any, includeDisabled bool) (e []E, c []T) {
 	return
 }
 
-func GetAll[T any](n any, includes ...Include) (c []T) {
+func GetAll[T any](n Node, includes ...Include) (c []T) {
 	_, c = GetAllComponents[T](n, includes...)
 	return
 }
 
-func GetAllComponents[T any](n any, includes ...Include) (e []E, c []T) {
+func GetAllComponents[T any](n Node, includes ...Include) (e []Node, c []T) {
 	include := mergeIncludes(includes)
 	if !include.NotSelf {
 		ee, cc := getAll[T](n, include.Disabled)
@@ -133,14 +157,14 @@ func GetAllComponents[T any](n any, includes ...Include) (e []E, c []T) {
 		}
 	}
 	if include.Parents {
-		for _, parent := range Parents(n) {
+		for _, parent := range Ancestors(n) {
 			ee, cc := getAll[T](parent, include.Disabled)
 			c = append(c, cc...)
 			e = append(e, ee...)
 		}
 	}
 	if include.Children && !include.Descendants {
-		for _, child := range Entities(n, Object) {
+		for _, child := range Subnodes(n, TypeObject) {
 			ee, cc := getAll[T](child, include.Disabled)
 			c = append(c, cc...)
 			e = append(e, ee...)
@@ -152,8 +176,8 @@ func GetAllComponents[T any](n any, includes ...Include) (e []E, c []T) {
 	return
 }
 
-func getFromDescendants[T any](n any, e *[]E, c *[]T, includeDisabled bool) {
-	for _, child := range Entities(n, Object) {
+func getFromDescendants[T any](n Node, e *[]Node, c *[]T, includeDisabled bool) {
+	for _, child := range Subnodes(n, TypeObject) {
 		ee, cc := getAll[T](child, includeDisabled)
 		*c = append(*c, cc...)
 		*e = append(*e, ee...)
@@ -185,52 +209,4 @@ type Include struct {
 func zero[T any]() T {
 	var zero T
 	return zero
-}
-
-// deprecated, use GetComponent
-func ComponentNode[T any](n any) (E, T) {
-	for _, c := range Entities(n, Component) {
-		if v, ok := Value(c).(T); ok {
-			return c, v
-		}
-	}
-	return nil, zero[T]()
-}
-
-func EnableComponent(n any) error {
-	if ComponentEnabled(n) {
-		return nil
-	}
-	rv := reflect.ValueOf(Value(n))
-	enableFn := rv.MethodByName("EnableComponent")
-	if enableFn.IsValid() {
-		_, err := fn.Call(enableFn, []any{})
-		if err != nil {
-			if e := SetAttr(n, "error", err.Error()); e != nil {
-				panic(e)
-			}
-			return err
-		}
-	}
-	return SetAttr(n, "enabled", "true")
-}
-
-func DisableComponent(n any) error {
-	if !ComponentEnabled(n) {
-		return nil
-	}
-	rv := reflect.ValueOf(Value(n))
-	if rv.IsValid() {
-		enableFn := rv.MethodByName("DisableComponent")
-		if enableFn.IsValid() {
-			_, err := fn.Call(enableFn, []any{})
-			if err != nil {
-				if e := SetAttr(n, "error", err.Error()); e != nil {
-					panic(e)
-				}
-				return err
-			}
-		}
-	}
-	return SetAttr(n, "enabled", "false")
 }

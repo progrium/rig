@@ -119,7 +119,7 @@ func ReadFromList[R any](ctx context.Context, lister Lister[R], id ID) (*R, erro
 }
 
 func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, creator Creater[C, R]) manifold.Node {
-	n := manifold.FromEntity(node.New(name, node.Attributes{
+	n := manifold.FromNode(node.New(name, node.Attributes{
 		"view": "fields",
 	}))
 	req := new(C)
@@ -137,7 +137,7 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 			r.SetSync(&v)
 			r.CheckSync()
 			nn := node.New(
-				node.Name(r.Latest),
+				"FIX ME", // TODO: should be like: node.Name(r.Latest.(node.Node)),
 				node.Attributes{
 					"view":      "fields",
 					"desc":      string(r.ID),
@@ -146,29 +146,29 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 				r,
 				&v,
 			)
-			node.SetStore(nn, node.GetStore(parent))
+			node.SetRealm(nn, node.GetRealm(parent))
 
-			lst, _ := node.ComponentNode[L](parent)
+			lst, _ := node.GetComponent[L](parent)
 			if lst == nil {
 				log.Panicf("no valid list on: %v", parent)
 			}
 			// add to list component node
-			node.AppendEntity(lst, node.Object, nn.ID) // error
+			node.AppendSubnode(lst, node.TypeObject, nn.ID) // error
 			// also add to object, setting its parent
-			parent.Objects().Append(manifold.FromEntity(nn)) // todo: avoid FromEntity?
+			parent.Objects().Append(manifold.FromNode(nn)) // todo: avoid FromEntity?
 
 			parent.Objects().Remove(n)      // error
 			parent.SetAttr("view", oldView) // error
 		},
 		Cancel: func() {
-			node.Destroy(n)               // error
+			node.Destroy(n)                 // error
 			parent.SetAttr("view", oldView) // error
 
 		},
 	}
 	// todo: errors
 	n.AddComponent(com)
-	node.SetStore(n, node.GetStore(parent))
+	node.SetRealm(n, node.GetRealm(parent))
 	parent.Objects().Append(n)
 	parent.SetAttr("view", "objects")
 	return n
@@ -191,8 +191,8 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes node.Nodes) {
 			v := r.Latest
 			r.SetSync(&v)
 			r.CheckSync()
-			nn := manifold.FromEntity(node.New(
-				node.Name(r.Latest),
+			nn := manifold.FromNode(node.New(
+				"FIX ME", // TODO: should be like: node.Name(r.Latest.(node.Node)),
 				node.Attributes{
 					"view":      "fields",
 					"desc":      string(r.ID),
@@ -201,7 +201,7 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes node.Nodes) {
 				r,
 				&v,
 			))
-			node.SetStore(nn, node.GetStore(com)) // hmmm
+			node.SetRealm(nn, node.GetRealm(com)) // hmmm
 			com.Objects().Append(nn)
 			continue
 		}

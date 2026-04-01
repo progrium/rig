@@ -56,7 +56,7 @@ func callWithVals(meth reflect.Value, vals map[reflect.Value]bool) ([]reflect.Va
 
 func (t *ObjectToggler) Activate(ctx context.Context) error {
 	obj := manifold.FromContext(ctx).Parent()
-	if obj == nil || obj.Kind() != node.Object {
+	if obj == nil || obj.Kind() != node.TypeObject {
 		return nil
 	}
 	if t.IncludeChildren {
@@ -139,7 +139,7 @@ func (t *ObjectToggler) enable(obj manifold.Node) {
 
 func (t *ObjectToggler) Deactivate(ctx context.Context) error {
 	obj := manifold.FromContext(ctx).Parent()
-	if obj == nil || obj.Kind() != node.Object {
+	if obj == nil || obj.Kind() != node.TypeObject {
 		return nil
 	}
 	t.disable(obj)

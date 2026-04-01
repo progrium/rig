@@ -11,5 +11,5 @@ func FromContext(ctx context.Context) Node {
 	if e == nil {
 		return nil
 	}
-	return FromEntity(e)
+	return FromNode(e)
 }

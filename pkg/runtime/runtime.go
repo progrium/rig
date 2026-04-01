@@ -65,7 +65,7 @@ func Run(mainFacets ...any) {
 	}
 
 	manifold.Walk(mod.Main(), func(n manifold.Node) error {
-		if n.Kind() == node.Component {
+		if n.Kind() == node.TypeComponent {
 			if a, ok := n.Value().(Awaker); ok {
 				a.Awake()
 			}
@@ -78,11 +78,11 @@ func Run(mainFacets ...any) {
 	bridge := &VSCodeBridge{}
 	inspector := Inspector{}
 	super := node.New(node.RootID, bridge, inspector)
-	if err := mod.Main().Store().Store(super); err != nil {
+	if err := mod.Main().Realm().Store(super); err != nil {
 		log.Fatal(err)
 	}
 	super.Children = []string{"@main"}
-	if err := mod.Main().SetParent(manifold.FromEntity(super)); err != nil {
+	if err := mod.Main().SetParent(manifold.FromNode(super)); err != nil {
 		log.Fatal(err)
 	}
 	wb := New(super)
@@ -135,9 +135,9 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 	}
 	defer listener.Close()
 
-	var watcher signals.Watcher[node.E]
-	if s := node.GetStore(mod.Main().Entity()); s != nil {
-		if sw, ok := s.(signals.Watcher[node.E]); ok {
+	var watcher signals.Watcher[node.Node]
+	if s := node.GetRealm(mod.Main()); s != nil {
+		if sw, ok := s.(signals.Watcher[node.Node]); ok {
 			watcher = sw
 		}
 	}
@@ -151,7 +151,7 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 			log.Fatal("Accept error:", err)
 		}
 
-		log.Println("session connected:", conn.RemoteAddr())
+		log.Println("session connected")
 		go func(sess mux.Session) {
 
 			peer := talk.NewPeer(sess, codec.CBORCodec{})
@@ -197,10 +197,10 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 				// latest connection takes over bridge
 				bridge.Peer = peer
 
-				signaler := signals.Func[node.E](func(s node.Signal) {
-					e := s.Receiver.(node.E)
-					// log.Println("signal:", s.Name, e.GetName(), s.Args)
-					if _, err := peer.Call(context.TODO(), "signaled", fn.Args{e.GetID()}, nil); err != nil {
+				signaler := signals.Func[node.Node](func(s node.Signal) {
+					e := s.Receiver.(node.Node)
+					log.Println("signal:", s.Name, node.Name(e), s.Args)
+					if _, err := peer.Call(context.TODO(), "signaled", fn.Args{e.NodeID()}, nil); err != nil {
 						if err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
 							log.Println(err)
 						}

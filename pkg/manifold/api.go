@@ -7,10 +7,14 @@ import (
 	"github.com/progrium/rig/pkg/signal"
 )
 
-type Signal = signal.Signal[node.E]
+type Signal = signal.Signal[node.Node]
 
 func Receiver(s Signal) Node {
-	return FromEntity(node.ToEntity(s.Receiver))
+	n, ok := s.Receiver.(Node)
+	if !ok {
+		panic("signal receiver is not a node")
+	}
+	return FromNode(n)
 }
 
 type Bus interface {
@@ -44,9 +48,10 @@ type Bus interface {
 }
 
 type Node interface {
-	Entity() node.E
+	Node() node.Node
+	NodeID() string
 	Signaled(s Signal)
-	Store() node.Store
+	Realm() node.Realm
 	// Bus() Bus
 
 	//RawRef() *node.Raw // copy, unless single threaded. always if remotenode
@@ -139,7 +144,7 @@ type Component struct {
 }
 
 func (embedder *Component) ComponentAttached(com node.Node) {
-	embedder.com = FromEntity(com)
+	embedder.com = FromNode(com)
 }
 
 func (embedder *Component) Node() Node {
@@ -147,7 +152,7 @@ func (embedder *Component) Node() Node {
 }
 
 func (embedder *Component) Object() Node {
-	return FromEntity(node.Parent(embedder.com))
+	return FromNode(node.Parent(embedder.com))
 }
 
 func Equal(a, b Node) bool {

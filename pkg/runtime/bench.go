@@ -67,7 +67,7 @@ func (t *Workbench) Fields(r rpc.Responder, c *rpc.Call) {
 	}
 	defer ch.Close()
 
-	if n.Kind() == node.Component {
+	if n.Kind() == node.TypeComponent {
 		if n.Value() == nil {
 			return
 		}
@@ -194,7 +194,7 @@ type %s struct {
 	}
 
 	com := node.NewRaw(typePath, nil, "")
-	com.Kind = node.Component
+	com.Kind = node.TypeComponent
 	com.Component = typePath
 	// todo: check if this component has already been added
 	c, err := n.Parent().AddComponent(com)
@@ -247,7 +247,7 @@ func (c *%s) Activate(ctx context.Context) error {
 `, typeName, typeName)
 
 	com := node.NewRaw(typePath, nil, "")
-	com.Kind = node.Component
+	com.Kind = node.TypeComponent
 	com.Component = typePath
 	c, err := n.AddComponent(com)
 	if err != nil {
@@ -287,7 +287,7 @@ func (t *Workbench) Dump(id string) {
 		log.Panicf("unable to find id: %s", id)
 	}
 	spewer := spew.ConfigState{MaxDepth: 2, Indent: "\t"}
-	spewer.Fdump(os.Stderr, n.Entity())
+	spewer.Fdump(os.Stderr, n.Node())
 }
 
 func (t *Workbench) GetTreeItem(id string) treeItem {
@@ -376,9 +376,9 @@ func (t *Workbench) Shutdown() {
 
 func (t *Workbench) findNode(id string) manifold.Node {
 	if id == "" {
-		return manifold.FromEntity(t.root)
+		return manifold.FromNode(t.root)
 	}
-	return manifold.FromEntity(node.GetStore(t.root).Resolve(id))
+	return manifold.FromNode(node.GetRealm(t.root).Resolve(id))
 }
 
 func (t *Workbench) Toggle(id string, state bool) error {
@@ -498,7 +498,7 @@ func (t *Workbench) Views(id string) (views []string) {
 		return
 	}
 	views = append(views, "objects")
-	if n.Kind() == node.Object {
+	if n.Kind() == node.TypeObject {
 		views = append(views, "components")
 	}
 	if n.Value() != nil {
@@ -508,7 +508,7 @@ func (t *Workbench) Views(id string) (views []string) {
 			views = append(views, "nodes")
 		}
 	}
-	if n.Kind() == node.Object && n.Components().Count() > 0 {
+	if n.Kind() == node.TypeObject && n.Components().Count() > 0 {
 		views = append(views, "fields")
 		for _, c := range n.Components().Nodes() {
 			_, ok := c.Value().(NodeProvider)
@@ -524,7 +524,7 @@ func isValidStructPtr(rv reflect.Value) bool {
 	return rv.Type().Kind() == reflect.Ptr && !rv.IsNil() && rv.Type().Elem().Kind() == reflect.Struct
 }
 
-func (t *Workbench) structFields(store node.Store, parentID string, rv reflect.Value) (items node.Children) {
+func (t *Workbench) structFields(store node.Realm, parentID string, rv reflect.Value) (items node.Children) {
 	rv = reflect.Indirect(rv)
 	for i := 0; i < rv.Type().NumField(); i++ {
 		f := rv.Type().Field(i)
@@ -551,7 +551,7 @@ func (t *Workbench) structFields(store node.Store, parentID string, rv reflect.V
 			}
 		}
 		n := node.NewID(id, f.Name, attrs, children)
-		if err := node.SetStore(n, store); err != nil {
+		if err := node.SetRealm(n, store); err != nil {
 			log.Println(err)
 		}
 		items = append(items, n)
@@ -564,10 +564,10 @@ func (t *Workbench) valueFields(n manifold.Node) (items []treeItem) {
 	if rv.IsNil() {
 		return
 	}
-	store := node.GetStore(n)
+	store := node.GetRealm(n)
 	for _, child := range t.structFields(store, n.ID(), rv) {
 		node.SetParent(child, n.ID())
-		items = append(items, t.nodeItem(manifold.FromEntity(child)))
+		items = append(items, t.nodeItem(manifold.FromNode(child)))
 	}
 	return
 }
@@ -599,7 +599,7 @@ func (t *Workbench) AddItem(id, typ, name string) error {
 			return err
 		}
 	}
-	if err := n.Store().Store(newnode); err != nil {
+	if err := n.Realm().Store(newnode); err != nil {
 		return err
 	}
 	if typ != "EmptyObject" && !strings.HasSuffix(typ, "()") {
@@ -607,7 +607,7 @@ func (t *Workbench) AddItem(id, typ, name string) error {
 			return err
 		}
 	}
-	if err := n.Objects().Append(manifold.FromEntity(newnode)); err != nil {
+	if err := n.Objects().Append(manifold.FromNode(newnode)); err != nil {
 		return err
 	}
 	return nil
@@ -717,14 +717,14 @@ func (t *Workbench) ToggleComponents(id string) {
 func (t *Workbench) GetChildren(id string) (items []treeItem) {
 	n := t.findNode(id)
 	v := n.Attr("view")
-	if v == "" && n.Kind() == node.Object {
+	if v == "" && n.Kind() == node.TypeObject {
 		v = "objects"
 	}
 	switch v {
 	case "":
 		return
 	case "fields":
-		if n.Kind() == node.Object {
+		if n.Kind() == node.TypeObject {
 			for _, com := range n.Components().Nodes() {
 				items = append(items, t.valueFields(com)...)
 			}
@@ -764,19 +764,19 @@ func ProvidedNodes(n manifold.Node) (nodes []manifold.Node) {
 	if !ok {
 		return
 	}
-	store := node.GetStore(n)
+	store := node.GetRealm(n)
 	for _, pn := range np.Nodes(n) {
-		nn := store.Resolve(pn.Entity().GetID())
+		nn := store.Resolve(pn.NodeID())
 		if nn == nil {
-			if err := node.SetStore(pn, store); err != nil {
+			if err := node.SetRealm(pn, store); err != nil {
 				log.Println(err)
 			}
 			if err := node.SetParent(pn, n.ID()); err != nil {
 				log.Println(err)
 			}
-			nn = pn.Entity()
+			nn = pn
 		}
-		nodes = append(nodes, manifold.FromEntity(nn))
+		nodes = append(nodes, manifold.FromNode(nn))
 	}
 	return
 }
@@ -789,9 +789,9 @@ func (t *Workbench) nodeItem(n manifold.Node) treeItem {
 	var contextValues []string
 	if n.Attr("view") == "" {
 		switch n.Kind() {
-		case node.Component:
+		case node.TypeComponent:
 			n.SetAttr("view", "fields")
-		case node.Object:
+		case node.TypeObject:
 			n.SetAttr("view", "objects")
 		}
 	}
@@ -829,7 +829,7 @@ func (t *Workbench) nodeItem(n manifold.Node) treeItem {
 	if desc != "" {
 		item.Description = desc
 	}
-	if n.Kind() == node.Component {
+	if n.Kind() == node.TypeComponent {
 		item.Description = n.ComponentType()
 		checkState := 0
 		if node.ComponentEnabled(n) {

@@ -1,21 +1,27 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 
+	"github.com/creack/pty"
 	"github.com/google/uuid"
 	"github.com/progrium/rig/net/tcp"
 	"github.com/progrium/rig/web"
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/mux"
 	"tractor.dev/toolkit-go/engine/cli"
-	"tractor.dev/toolkit-go/engine/fs"
 	"tractor.dev/wanix"
+	"tractor.dev/wanix/fs"
 	"tractor.dev/wanix/fs/localfs"
 	"tractor.dev/wanix/term"
 	"tractor.dev/wanix/vfs/pipe"
@@ -26,8 +32,8 @@ import (
 func serveCmd() *cli.Command {
 	cmd := &cli.Command{
 		Usage: "serve",
-		Short: "Hi",
-		Long:  `Hello world\nAgain\n\n`,
+		Short: "",
+		Long:  ``,
 		Run:   serve,
 	}
 	return cmd
@@ -97,4 +103,70 @@ func serve(ctx *cli.Context, args []string) {
 
 	fmt.Println("Serving web directory on http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func allocHook(s *term.Service, rid string) error {
+	r, err := s.Get(rid)
+	if err != nil {
+		return err
+	}
+	c := exec.Command("/bin/sh")
+	ptmx, err := pty.Start(c)
+	if err != nil {
+		return err
+	}
+	prg, err := fs.OpenFile(r, "program", os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	winch, err := r.Open("winch")
+	if err != nil {
+		return err
+	}
+	go func() {
+		r := bufio.NewScanner(winch)
+		for r.Scan() {
+			line := strings.Split(strings.TrimSpace(r.Text()), " ")
+			cols, err := strconv.ParseUint(line[0], 10, 16)
+			if err != nil {
+				log.Println("winch:", err)
+				continue
+			}
+			rows, err := strconv.ParseUint(line[1], 10, 16)
+			if err != nil {
+				log.Println("winch:", err)
+				continue
+			}
+			size := pty.Winsize{
+				Cols: uint16(cols),
+				Rows: uint16(rows),
+			}
+			pty.Setsize(ptmx, &size)
+		}
+		if err := r.Err(); err != nil {
+			log.Println("winch:", err)
+		}
+	}()
+	go func() {
+		if _, err := io.Copy(prg.(io.Writer), ptmx); err != nil {
+			log.Println("ptmx->prg:", err)
+		}
+	}()
+	go func() {
+		if _, err := io.Copy(ptmx, prg.(io.Reader)); err != nil {
+			log.Println("prg->ptmx:", err) // todo? io.ErrClosed after program exits
+		}
+	}()
+	go func() {
+		if err := c.Wait(); err != nil {
+			log.Println("cmd:", err)
+		}
+		if err := ptmx.Close(); err != nil {
+			log.Println("ptmx:", err)
+		}
+		if err := prg.Close(); err != nil {
+			log.Println("prg:", err)
+		}
+	}()
+	return nil
 }

@@ -14,7 +14,7 @@ var SaveDebounceDuration = 500 * time.Millisecond
 
 type M struct {
 	name     string
-	store    *node.MemStore
+	store    *node.BasicRealm
 	provider Provider
 	debounce func(func())
 }
@@ -63,7 +63,7 @@ func (m *M) Name() string {
 }
 
 func (m *M) Main() manifold.Node {
-	return manifold.FromEntity(m.store.Resolve("@main"))
+	return manifold.FromNode(m.store.Resolve("@main"))
 }
 
 func (m *M) Save() error {
@@ -77,7 +77,7 @@ func (m *M) Save() error {
 	return m.provider.SaveAll(nodes)
 }
 
-func (m *M) Signaled(s signal.Signal[node.E]) {
+func (m *M) Signaled(s signal.Signal[node.Node]) {
 	// e := s.Receiver.(node.E)
 	// log.Println("event:", s.Name, e.GetName(), s.Args)
 	m.debounce(func() {

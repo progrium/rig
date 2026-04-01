@@ -61,12 +61,12 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 						var action Action
 						c.Receive(&action)
 						parts := strings.SplitN(action.Selector, "/", 2)
-						n := m.Object().Store().Resolve(parts[0])
+						n := m.Object().Realm().Resolve(parts[0])
 						if n == nil {
 							r.Return(fmt.Errorf("not found: %s", parts[0]))
 							return
 						}
-						if err := telepath.Select(node.Value(n.Entity()), parts[1]).Set(action.Value); err != nil {
+						if err := telepath.Select(node.Value(n), parts[1]).Set(action.Value); err != nil {
 							r.Return(err)
 							return
 						}
@@ -106,14 +106,14 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 	// todo: shouldn't there be a better way to watch the store?
 	// todo: race? occasionally get:
 	// panic: interface conversion: entity.Store is nil, not *node.Store
-	store := m.Object().Store().(*node.MemStore)
+	store := m.Object().Realm().(*node.BasicRealm)
 	store.Watch(m)
 
 	return nil
 }
 
-func (m *Inspector) Signaled(s signal.Signal[node.E]) {
-	n := node.Snapshot(s.Receiver.(node.E))
+func (m *Inspector) Signaled(s signal.Signal[node.Node]) {
+	n := node.Snapshot(s.Receiver.(node.Node))
 	m.updates.Publish(n)
 }
 
@@ -140,7 +140,7 @@ func (m *Inspector) handlePeer(peer *talk.Peer) {
 	m.updates.Subscribe(updates)
 	go func() {
 		for n := range updates {
-			nn := m.Object().Store().Resolve(n.ID)
+			nn := m.Object().Realm().Resolve(n.ID)
 			if nn == nil {
 				// deleted
 				stateMu.Lock()

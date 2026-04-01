@@ -41,12 +41,12 @@ type Raw struct {
 
 	N uint
 
-	store Store
+	realm Realm
 	root  *Raw
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	// err   error
 
-	signal.Dispatcher[E]
+	signal.Dispatcher[Node]
 }
 
 func NewRaw(name string, value any, id string) *Raw {
@@ -57,7 +57,7 @@ func NewRaw(name string, value any, id string) *Raw {
 		}
 	}
 	return &Raw{
-		Kind:  Object,
+		Kind:  TypeObject,
 		ID:    id,
 		Name:  name,
 		Value: value,

@@ -7,6 +7,9 @@ import (
 	"tractor.dev/toolkit-go/engine"
 )
 
+// EXPERIMENTAL: activate/deactivate
+// TODO: revisit all this...
+
 type Activator interface {
 	Activate(ctx context.Context) error
 }
@@ -46,13 +49,13 @@ func Activate(ctx context.Context, n Node) error {
 
 	stateful := false
 	asm, _ := engine.New()
-	for _, com := range Entities(n, Component) {
+	for _, com := range Subnodes(n, TypeComponent) {
 		v := Value(com)
 		if err := asm.Add(v); err != nil {
 			panic(err)
 		}
 	}
-	for _, com := range Entities(n, Component) {
+	for _, com := range Subnodes(n, TypeComponent) {
 		v := Value(com)
 		if err := asm.Assemble(v); err != nil {
 			panic(err)
@@ -98,7 +101,7 @@ func Deactivate(ctx context.Context, n Node) error {
 		return SetAttr(n, "activated", "false")
 	}
 
-	for _, com := range Entities(n, Component) {
+	for _, com := range Subnodes(n, TypeComponent) {
 		activator, ok := Value(com).(Deactivator)
 		if ok {
 			if err := activator.Deactivate(Context(ctx, com)); err != nil {

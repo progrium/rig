@@ -8,47 +8,52 @@ import (
 	"github.com/progrium/rig/pkg/signal"
 )
 
-type Signal = signal.Signal[E]
+// Signal is a named event targeted at a Node receiver with optional arguments.
+type Signal = signal.Signal[Node]
 
-type SignalEntity interface {
+// SignalNode is implemented by nodes that handle signals delivered via Send.
+type SignalNode interface {
+	Node
 	Signaled(s Signal)
 }
 
-func Signaled(v any, s Signal) {
-	if e := ToEntity(v); e != nil {
-		if se, ok := e.(SignalEntity); ok {
-			se.Signaled(s)
-		}
+// Signaled invokes n.Signaled(s) when n implements SignalNode; otherwise it is a no-op.
+func Signaled(n Node, s Signal) {
+	if sn, ok := Unwrap[SignalNode](n); ok {
+		sn.Signaled(s)
 	}
 }
 
-func Send(v any, sig string, args ...any) error {
-	if e := ToEntity(v); e != nil {
+// Send delivers a signal to n when n implements SignalNode.
+// If sig is empty, the name of the direct caller is used as the signal name.
+// It returns errors.ErrUnsupported when n does not implement SignalNode.
+func Send(n Node, sig string, args ...any) error {
+	if sn, ok := Unwrap[SignalNode](n); ok {
 		if sig == "" {
 			sig = fnCaller(1)
 		}
-		if se, ok := e.(SignalEntity); ok {
-			signal.Send(se, sig, args...)
-			return nil
-		}
+		signal.Send(sn, sig, args...)
+		return nil
 	}
 	return errors.ErrUnsupported
 }
 
-func Watch(v any, fn signal.Func[E]) error {
-	if e := ToEntity(v); e != nil {
-		if w, ok := e.(signal.Watcher[E]); ok {
-			w.Watch(fn)
-		}
+// Watch registers fn as a signal receiver on n when n implements signal.Watcher[Node].
+// It returns errors.ErrUnsupported otherwise.
+func Watch(n Node, fn signal.Func[Node]) error {
+	if sn, ok := Unwrap[signal.Watcher[Node]](n); ok {
+		sn.Watch(fn)
+		return nil
 	}
 	return errors.ErrUnsupported
 }
 
-func Unwatch(v any, fn signal.Func[E]) error {
-	if e := ToEntity(v); e != nil {
-		if w, ok := e.(signal.Watcher[E]); ok {
-			w.Unwatch(fn)
-		}
+// Unwatch removes a previously registered fn from n when n implements signal.Watcher[Node].
+// It returns errors.ErrUnsupported otherwise.
+func Unwatch(n Node, fn signal.Func[Node]) error {
+	if w, ok := Unwrap[signal.Watcher[Node]](n); ok {
+		w.Unwatch(fn)
+		return nil
 	}
 	return errors.ErrUnsupported
 }
@@ -60,26 +65,31 @@ func fnCaller(n int) string {
 	return fqn[len(fqn)-1]
 }
 
+// Signaled handles incoming signals for Raw nodes.
+// When s targets this node, it forwards to the embedded Dispatcher and, if the node's Realm
+// implements signal.Receiver[Node], to the realm as well.
+// It then asynchronously notifies component values (for object nodes with components) and the
+// immediate parent when they implement signal.Receiver[Node].
 func (r *Raw) Signaled(s Signal) {
-	if s.Receiver.(E).GetID() == r.ID {
+	if s.Receiver.(Node).NodeID() == r.ID {
 		r.Dispatcher.Signaled(s)
-		store := GetStore(r)
-		if store != nil {
-			if sn, ok := store.(signal.Receiver[E]); ok {
+		realm := GetRealm(r)
+		if realm != nil {
+			if sn, ok := realm.(signal.Receiver[Node]); ok {
 				sn.Signaled(s)
 			}
 		}
 	}
 	go func() {
-		if Kind(r) == Object && EntityCount(r, Component) > 0 {
-			for _, com := range Entities(r, Component) {
-				if sr, ok := Value(com).(signal.Receiver[E]); ok {
+		if Kind(r) == TypeObject && SubnodeCount(r, TypeComponent) > 0 {
+			for _, com := range Subnodes(r, TypeComponent) {
+				if sr, ok := Value(com).(signal.Receiver[Node]); ok {
 					sr.Signaled(s)
 				}
 			}
 		}
 
-		if sr, ok := Parent(r).(signal.Receiver[E]); ok {
+		if sr, ok := Parent(r).(signal.Receiver[Node]); ok {
 			sr.Signaled(s)
 		}
 	}()

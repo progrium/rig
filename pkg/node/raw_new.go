@@ -1,24 +1,39 @@
 package node
 
 import (
-	"reflect"
-
 	"github.com/progrium/rig/pkg/meta"
 )
 
+// Attributes is a facet for New/NewID: key/value pairs merged into the new node's attributes.
 type Attributes map[string]string
 
+// Children is a facet for New/NewID: raw child nodes attached under the new node.
 type Children []*Raw
 
+// Initializer is implemented by component values that run one-time setup when the component
+// is created via New/NewID (non-factory facets).
 type Initializer interface {
 	Initialize()
 }
 
+// New builds a Raw node with an auto-generated id, the given name, and optional facets.
+// See NewID for supported facet types and post-construction behavior.
 func New(name string, facets ...any) *Raw {
 	n := NewID("", name, facets...)
 	return n
 }
 
+// NewID builds a Raw node with the given id and name, then applies facets in order:
+//   - Attributes: merged into the node's Attrs
+//   - Children or *Raw: attached as ordered children; their embedded map is folded into this
+//     node, Embedded cleared on the child, realm cleared, root set to this node
+//   - meta.Factory: builds a component via factory.New(), stores _factory on the component
+//   - any other value: wrapped with NewComponent; if it implements Initializer, Initialize runs;
+//     ComponentAttacher.ComponentAttached is invoked asynchronously; Deactivator forces
+//     attribute "activated" to "false"
+//
+// After facets, EnableComponent is attempted for each direct component subnode that has no
+// prior error attribute; the first enable error is written on this node as attribute "error".
 func NewID(id, name string, facets ...any) *Raw {
 	n := NewRaw(name, nil, id)
 	n.Embedded = make(map[string]*Raw)
@@ -37,7 +52,7 @@ func NewID(id, name string, facets ...any) *Raw {
 		// to nil and set its root to us
 		// before putting it in our embedded
 		child.Embedded = nil
-		child.store = nil
+		child.realm = nil
 		child.root = n
 		n.Embedded[child.ID] = child
 
@@ -86,7 +101,7 @@ func NewID(id, name string, facets ...any) *Raw {
 		}
 	}
 	// todo: wait until this node attached to root so enable can include parents?
-	for _, com := range Entities(n, Component) {
+	for _, com := range Subnodes(n, TypeComponent) {
 		if Error(com) != nil {
 			continue
 		}
@@ -96,28 +111,4 @@ func NewID(id, name string, facets ...any) *Raw {
 		}
 	}
 	return n
-}
-
-func Snapshot(e Node) Raw {
-	if r, ok := e.Entity().(*Raw); ok {
-		v := *r
-		v.Value = dupVal(v.Value)
-		return v
-	}
-	panic("todo: build raw from non-raw based entity")
-}
-
-// DupVal uses reflection to duplicate a value. Not a deep copy!
-func dupVal(v any) any {
-	if v == nil {
-		return nil
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {
-		el := rv.Elem()
-		nv := reflect.New(el.Type())
-		nv.Elem().Set(el)
-		return nv.Interface()
-	}
-	return rv.Interface()
 }

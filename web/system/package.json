@@ -61,6 +61,9 @@
       ],
       "view/item/context": [
         {
+          "command": "rig.open"
+        },
+        {
           "command": "manifold.switchView"
         },
         {
@@ -119,23 +122,28 @@
       "webview/context": [
         {
           "command": "manifold.deleteFromInspector",
-          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+          "when": "webviewId == 'manifold-sidebar.inspector' && webviewSection == 'more'"
         },
         {
           "command": "manifold.callMethodFromInspector",
-          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+          "when": "webviewId == 'manifold-sidebar.inspector' && webviewSection == 'more'"
         },
         {
           "command": "manifold.viewSourceFromInspector",
-          "when": "webviewId == 'manifold.inspector' && webviewSection == 'more'"
+          "when": "webviewId == 'manifold-sidebar.inspector' && webviewSection == 'more'"
         },
         {
           "command": "manifold.implementFromInspector",
-          "when": "webviewId == 'manifold.inspector' && webviewSection == 'ref'"
+          "when": "webviewId == 'manifold-sidebar.inspector' && webviewSection == 'ref'"
         }
       ]
     },
     "commands": [
+      {
+        "command": "rig.open",
+        "title": "Open Node",
+        "category": "Rig"
+      },
       {
         "command": "rig.createTerminal",
         "title": "Create New Terminal",

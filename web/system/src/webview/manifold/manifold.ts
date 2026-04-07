@@ -16,9 +16,9 @@ interface RawNode {
   
   export class Node {
     _id: string;
-    _store: Store;
+    _store: Realm;
   
-    constructor(store: Store, id: string) {
+    constructor(store: Realm, id: string) {
       this._store = store;
       this._id = id;
     }
@@ -27,7 +27,7 @@ interface RawNode {
       return this._id;
     }
   
-    get store(): Store {
+    get store(): Realm {
       return this._store;
     }
   
@@ -180,12 +180,19 @@ interface RawNode {
     }
   }
   
-  export class Store extends EventTarget {
+  export class Realm extends EventTarget {
     nodes: Record<string,RawNode>;
+    ready: Promise<void>;
+
+    _firstUpdate: (() => void) | null;
   
     constructor() {
       super();
       this.nodes = {};
+      this._firstUpdate = null;
+      this.ready = new Promise((resolve) => {
+        this._firstUpdate = resolve;
+      });
     }
   
     resolve(id: string): Node|null {
@@ -220,6 +227,11 @@ interface RawNode {
       }
       for (const id of removed) {
         this.dispatchEvent(new CustomEvent("remove", {detail: new Node(this, id)}));
+      }
+      this.dispatchEvent(new CustomEvent("change", {detail: [...added, ...updated, ...removed]}));
+      if (this._firstUpdate) {
+        this._firstUpdate();
+        this._firstUpdate = null;
       }
     }
   }

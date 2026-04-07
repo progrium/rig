@@ -1,4 +1,29 @@
 import * as vscode from 'vscode';
+import * as duplex from "@progrium/duplex";
+
+export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: duplex.Peer) {
+    const tempFS = new TempFileSystemProvider();
+    const scheme = 'tmpfs';
+    const registeredListeners = new Set<string>();
+    ctx.subscriptions.push(vscode.workspace.registerFileSystemProvider(scheme, tempFS, { isCaseSensitive: true }));
+    ctx.subscriptions.push(vscode.commands.registerCommand('manifold.editBuffer', async (path: string, data: Uint8Array) => {
+      const uri = vscode.Uri.parse(`${scheme}:/${path}`);
+      tempFS.writeFile(uri, data, { create: true, overwrite: true });
+      if (!registeredListeners.has(uri.toString())) {
+        tempFS.onDidChangeFile((events) => {
+          for (const event of events) {
+            if (event.uri.toString() === uri.toString() && event.type === vscode.FileChangeType.Changed) {
+              const data = tempFS.readFile(uri);
+              peer.call("bridge.BufferChanged", [path, data]);
+            }
+          }
+        });
+        registeredListeners.add(uri.toString());
+      }
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document);
+  }));
+}
 
 export class TempFileSystemProvider implements vscode.FileSystemProvider {
 

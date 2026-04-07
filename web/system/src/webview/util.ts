@@ -1,6 +1,6 @@
 const maxRetries = 10;
 
-export async function connectWithRetry(url: string, onReconnect?: (conn: Conn) => void): Promise<Conn> {
+export async function connectWithRetry(url: string, onconnect: (conn: Conn) => any): Promise<Conn> {
     let retryCount = 0;
     let connected = false;
 
@@ -8,19 +8,20 @@ export async function connectWithRetry(url: string, onReconnect?: (conn: Conn) =
         function attemptConnection() {
             const socket = new WebSocket(url);
             socket.onopen = () => {
-                // console.log('Connected to server');
+                // console.log('Connected!');
                 retryCount = 0;
                 connected = true;
-                resolve(new Conn(socket));
+                resolve(onconnect(new Conn(socket)));
             };
 
             socket.onerror = (err) => {
                 // console.log('Connection error:', err);
                 socket.close(); // Close the socket on error
                 if (retryCount < maxRetries) {
+                    const backoff = Math.random() * Math.min(500 * 2 ** retryCount, 30000);
+                    // console.log(`Retrying in ${backoff} millisecond... (${retryCount}/${maxRetries})`);
                     retryCount++;
-                    console.log(`Retrying in 2 second... (${retryCount}/${maxRetries})`);
-                    setTimeout(attemptConnection, 2000); // Retry after 1 second
+                    setTimeout(attemptConnection, backoff); // Retry after 1 second
                 } else {
                     reject(new Error('Max retries reached. Unable to connect.'));
                 }
@@ -30,11 +31,8 @@ export async function connectWithRetry(url: string, onReconnect?: (conn: Conn) =
                 if (!connected) {
                   return;
                 }
-                console.log(`Connection closed. Reconnecting in 1 second... (${retryCount}/${maxRetries})`);
-                setTimeout(async () => {
-                  const conn = await connectWithRetry(url, onReconnect);
-                  if (onReconnect) onReconnect(conn);
-                }, 1000); 
+                // console.log(`Connection closed. Reconnecting in 2 seconds... (${retryCount}/${maxRetries})`);
+                setTimeout(async () => connectWithRetry(url, onconnect), 2000); 
             };
         }
 

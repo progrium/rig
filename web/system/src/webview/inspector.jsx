@@ -30,9 +30,9 @@ export const Inspector = {
     
     const oncheck = (e) => {
       if (e.target.checked) {
-        window.parent.postMessage({action: "manifold.activate", args: [e.target.name]}, "*");
+        window.vscode.postMessage({action: "manifold.activate", args: [e.target.name]}, "*");
       } else {
-        window.parent.postMessage({action: "manifold.deactivate", args: [e.target.name]}, "*");
+        window.vscode.postMessage({action: "manifold.deactivate", args: [e.target.name]}, "*");
       }
     }
     const isEnabled = (id) => {
@@ -61,7 +61,14 @@ export const Inspector = {
                   oninput={oncheck} 
                   checked={isEnabled(f.ID)} />}
                 label={f.Name} 
-                extra={<atom.Icon name="far fa-ellipsis-h" onclick={(e) => window.parent.postMessage({menu: "menu-more", params: {id: f.ID, clientX: e.clientX, clientY: e.clientY}}, "*") } />}>
+                extra={<div data-vscode-context='{"webviewSection": "more", "preventDefaultContextMenuItems": true}'><atom.Icon name="far fa-ellipsis-h" 
+                  onclick={(e) => {
+                  e.preventDefault();
+                  e.target.dispatchEvent(new MouseEvent("contextmenu", { id: f.ID, bubbles: true, clientX: e.clientX, clientY: e.clientY }));
+                  e.stopPropagation();
+                  //window.vscode.postMessage({menu: "menu-more", params: {id: f.ID, clientX: e.clientX, clientY: e.clientY}}, "*") 
+                  }} 
+                /></div>}>
               {(f.Fields||[]).map((f) => <field.Inspector field={f} store={attrs.store} />)}
             </prop.Nested>
           )
@@ -69,11 +76,11 @@ export const Inspector = {
         </div>
         <hr />
         {!subject.isComponent && <button onclick={(e) => {
-          window.parent.postMessage({action: "manifold.addComponent", args: [subject.id]}, "*");
+          window.vscode.postMessage({action: "manifold.addComponent", args: [subject.id]}, "*");
         }}><atom.Icon name="far fa-plus" /></button>}
         &nbsp;
         {!subject.isComponent && <button onclick={(e) => {
-          window.parent.postMessage({action: "manifold.newComponent", args: [subject.id]}, "*");
+          window.vscode.postMessage({action: "manifold.newComponent", args: [subject.id]}, "*");
         }}><atom.Icon name="far fa-file-plus" /></button>}
       </div>
     )

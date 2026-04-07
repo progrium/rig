@@ -1,5 +1,23 @@
 
 import * as vscode from 'vscode';
+import { manifold } from '../webview/webview.js';
+
+export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: any, realm: manifold.Realm) {
+    const token = (await fsys.readText("root/etc/token")).trim();
+    const inspector = new InspectorViewProvider(ctx.extensionUri, "ws://localhost:8080/inspector/"+token, peer);
+	
+	ctx.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(InspectorViewProvider.viewType, inspector),
+		vscode.commands.registerCommand('manifold.inspect', (id: string) => {
+            inspector.selectNode(id);
+        })
+	);
+
+	realm.addEventListener("change", (event) => {
+		inspector.reload();
+	});
+    
+}
 
 export class InspectorViewProvider implements vscode.WebviewViewProvider {
 
@@ -24,7 +42,7 @@ export class InspectorViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 		const fields: any[] = [];
-		const resp = await this.peer.call("Fields", this._selectedID);
+		const resp = await this.peer.call("fields", this._selectedID);
 		while (true) {
 			const field = await resp.receive();
 			if (field === null) {
@@ -80,11 +98,12 @@ import {
 } from "${this._extensionUri.with({path: "system/dist/webview/webview.js"}).toString()}";
 
   window.m = m;
-  window.nodes = new manifold.Store();
+  window.nodes = new manifold.Realm();
+  window.vscode = acquireVsCodeApi();
   
   var peer = undefined;
-  const conn = await util.connectWithRetry("${this.websocketURL}", (reconn) => {
-    const sess = new duplex.Session(reconn);
+  peer = await util.connectWithRetry("${this.websocketURL}", (conn) => {
+    const sess = new duplex.Session(conn);
     if (!peer) {
       peer = new duplex.Peer(sess, new duplex.CBORCodec());
     } else {
@@ -92,13 +111,12 @@ import {
       peer.caller = new duplex.Client(sess, new duplex.CBORCodec());
       peer.respond();
     }
+	return peer;
   });
-  const sess = new duplex.Session(conn);
-	peer = new duplex.Peer(sess, new duplex.CBORCodec());
-
+  
   peer.handle("update", duplex.HandlerFunc(async (r, c) => {
     const update = await c.receive();
-    console.log("update:", Object.keys(update).length, update);
+    // console.log("update:", Object.keys(update).length);
     window.nodes.update(update);
     m.redraw();
   }));

@@ -52,7 +52,7 @@ func LoadFrom(name string, provider Provider, defaultNodes ...*node.Raw) (*M, er
 func New(name string) *M {
 	m := &M{
 		name:     name,
-		store:    node.NewStore(),
+		store:    node.NewRealm(true),
 		debounce: debouncer.New(SaveDebounceDuration),
 	}
 	return m

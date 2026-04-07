@@ -54,16 +54,18 @@ func GetRealm(n Node) Realm {
 // It embeds signal.Dispatcher[Node] so stored nodes can participate in signaling.
 // The mutex protects the nodes map; callers should not mutate the map directly.
 type BasicRealm struct {
-	nodes map[string]*Raw
-	mu    sync.Mutex
+	nodes  map[string]*Raw
+	strict bool // if true, import will fail if component type is not found
+	mu     sync.Mutex
 
 	signal.Dispatcher[Node]
 }
 
-// NewStore returns an empty BasicRealm ready for Store.
-func NewStore() *BasicRealm {
+// NewRealm returns an empty BasicRealm ready for Store/Resolve/Destroy.
+func NewRealm(strict bool) *BasicRealm {
 	return &BasicRealm{
-		nodes: make(map[string]*Raw),
+		nodes:  make(map[string]*Raw),
+		strict: strict,
 	}
 }
 
@@ -179,7 +181,7 @@ func (s *BasicRealm) Import(data []Raw) error {
 	var ptrs []valuePtr
 	var loaded []*Raw
 	for _, d := range data {
-		n, err := loadNode(d)
+		n, err := loadNode(d, s.strict)
 		if err != nil {
 			return err
 		}
@@ -241,7 +243,7 @@ func (s *BasicRealm) findValue(v any) (found *Raw, ok bool) {
 	return
 }
 
-func loadNode(data any) (*Raw, error) {
+func loadNode(data any, strict bool) (*Raw, error) {
 	var raw Raw
 	if err := mapstructure.Decode(data, &raw); err != nil {
 		return nil, err
@@ -267,13 +269,13 @@ func loadNode(data any) (*Raw, error) {
 		// set new instance as value
 		raw.Value = v
 	} else {
-		if raw.Component != "" {
+		if raw.Component != "" && strict {
 			raw.Attrs["error"] = fmt.Sprintf("unable to load component: %s", raw.Component)
 			raw.Value = nil
 			if err := DisableComponent(&raw); err != nil {
 				panic(err)
 			}
-			return &raw, nil
+			return &raw, fmt.Errorf("unable to load component: %s", raw.Component)
 		}
 	}
 	for k, v := range raw.Attrs {

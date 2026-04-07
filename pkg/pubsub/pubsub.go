@@ -55,7 +55,9 @@ func (t *Topic[T]) Dispatch() {
 		for _, sub := range subs {
 			select {
 			case sub <- msg:
-			default:
+			case <-time.After(2 * time.Second):
+				log.Println("warning: subscriber timeout, unsubscribing", sub)
+				t.Unsubscribe(sub)
 			}
 		}
 	}

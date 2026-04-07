@@ -11,3 +11,9 @@ web/vscode:
 	mv .tmp/dist/vscode web/vscode
 	rm -rf .tmp
 	rm web/vscode.zip
+
+toolkit-go:
+	git clone https://github.com/tractordev/toolkit-go
+
+go.work: toolkit-go
+	go work init . ./toolkit-go

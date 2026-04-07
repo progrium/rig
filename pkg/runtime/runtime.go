@@ -208,27 +208,45 @@ func runService(mod *module.M, wb *Workbench, socketPath string, bridge *VSCodeB
 				})
 				watcher.Watch(signaler)
 
+				// FYI: using wanix /net/tcp doesnt close
+				// when session disconnects. this basically
+				// does nothing.
+			KeepAlive:
 				for {
 					// little keep alive
 					<-time.After(1 * time.Second)
-					if err := r.Send(nil); err != nil {
-						if err != io.EOF {
-							log.Println(err)
+					ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+					errCh := make(chan error, 1)
+					go func() {
+						errCh <- r.Send(nil)
+					}()
+					select {
+					case err := <-errCh:
+						// log.Println("keepalive:", err)
+						if err != nil {
+							if err != io.EOF {
+								log.Println(err)
+							}
+							break KeepAlive
 						}
-						break
+					case <-ctx.Done():
+						log.Println("session keep alive timed out after 1 second")
+						break KeepAlive
 					}
+					cancel()
 				}
 
+				log.Println("session disconnected")
 				watcher.Unwatch(signaler)
 
-				connected.Store(false)
-				go func() {
-					<-time.After(1 * time.Second)
-					if !connected.Load() {
-						wb.Shutdown()
-						os.Exit(0)
-					}
-				}()
+				// connected.Store(false)
+				// go func() {
+				// 	<-time.After(1 * time.Second)
+				// 	if !connected.Load() {
+				// 		wb.Shutdown()
+				// 		os.Exit(0)
+				// 	}
+				// }()
 			}))
 
 			peer.Respond()

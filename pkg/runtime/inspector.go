@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/progrium/rig/pkg/field"
 	"github.com/progrium/rig/pkg/manifold"
+	"github.com/progrium/rig/pkg/meta"
 	"github.com/progrium/rig/pkg/node"
 	"github.com/progrium/rig/pkg/pubsub"
 	"github.com/progrium/rig/pkg/signal"
 	"github.com/progrium/rig/pkg/telepath"
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/codec"
+	"tractor.dev/toolkit-go/duplex/fn"
 	"tractor.dev/toolkit-go/duplex/mux"
 	"tractor.dev/toolkit-go/duplex/rpc"
 	"tractor.dev/toolkit-go/duplex/talk"
@@ -26,6 +30,7 @@ type Action struct {
 	Selector string
 	Type     string
 	Value    any
+	Args     []any
 }
 
 type Inspector struct {
@@ -57,6 +62,56 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					ws.PayloadType = websocket.BinaryFrame
 					sess := mux.New(ws)
 					peer := talk.NewPeer(sess, codec.CBORCodec{})
+					peer.Handle("fields", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var id string
+						c.Receive(&id)
+
+						n := m.Object().Realm().Resolve(id)
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", id))
+							return
+						}
+
+						ch, err := r.Continue()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						defer ch.Close()
+
+						if node.IsComponent(n) {
+							if node.Value(n) == nil {
+								return
+							}
+							com := field.FromValue(node.Value(n), field.WithFieldInfo(node.Name(n), n.NodeID()))
+							for _, f := range field.ToData(com).Fields {
+								if err := r.Send(f); err != nil {
+									log.Println(err)
+									return
+								}
+							}
+						} else {
+							mn := manifold.FromNode(n)
+							for _, n := range mn.Components().Nodes() {
+								if n.Value() == nil {
+									continue
+								}
+								f := field.FromValue(n.Value(), field.WithFieldInfo(n.Name(), n.ID()))
+								if err := r.Send(field.ToData(f)); err != nil {
+									log.Println(err)
+									return
+								}
+							}
+						}
+					}))
+					peer.Handle("listCatalog", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						c.Receive(nil)
+						var symbols []string
+						for k := range meta.Components {
+							symbols = append(symbols, k)
+						}
+						r.Return(symbols)
+					}))
 					peer.Handle("setValue", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
@@ -72,6 +127,78 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 						}
 						node.Send(n, "UpdateValue", action.Selector, action.Value)
 					}))
+					peer.Handle("addComponent", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var action Action
+						c.Receive(&action)
+						n := m.Object().Realm().Resolve(action.Selector)
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", action.Selector))
+							return
+						}
+
+						if action.Value == nil || action.Value == "" {
+							r.Return(fmt.Errorf("type is required"))
+							return
+						}
+
+						typ := action.Value.(string)
+						t, ok := meta.Components[typ]
+						if !ok {
+							r.Return(fmt.Errorf("%s type not found", typ))
+							return
+						}
+						v := reflect.New(t).Interface()
+						if i, ok := v.(node.Initializer); ok {
+							i.Initialize()
+						}
+
+						mn := manifold.FromNode(n)
+						com, err := mn.AddComponent(v)
+						if err != nil {
+							r.Return(err)
+							return
+						}
+						r.Return(com.ID())
+					}))
+					peer.Handle("addObject", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var action Action
+						c.Receive(&action)
+						n := m.Object().Realm().Resolve(action.Selector)
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", action.Selector))
+							return
+						}
+						mn := manifold.FromNode(n)
+						if action.Value == nil || action.Value == "" {
+							r.Return(fmt.Errorf("name is required"))
+							return
+						}
+						newNode := node.New(action.Value.(string))
+						if err := mn.Realm().Store(newNode); err != nil {
+							r.Return(err)
+							return
+						}
+						if err := mn.Objects().Append(manifold.FromNode(newNode)); err != nil {
+							r.Return(err)
+							return
+						}
+						r.Return(newNode.NodeID())
+					}))
+					peer.Handle("callMethod", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var action Action
+						c.Receive(&action)
+						parts := strings.SplitN(action.Selector, "/", 2)
+						n := m.Object().Realm().Resolve(parts[0])
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", parts[0]))
+							return
+						}
+						mn := manifold.FromNode(n)
+						if err := telepath.Select(mn, parts[1]).Call(fn.Args(action.Args)); err != nil {
+							r.Return(err)
+							return
+						}
+					}))
 					// TODO: besides finishing these, maybe entity should be responsible for
 					// using telepath to update values to keep the signaling in entity
 					peer.Handle("appendValue", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
@@ -82,7 +209,17 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					peer.Handle("unsetValue", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
-						log.Println("TODO: unset", action)
+						parts := strings.SplitN(action.Selector, "/", 2)
+						n := m.Object().Realm().Resolve(parts[0])
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", parts[0]))
+							return
+						}
+						if err := telepath.Select(node.Value(n), parts[1]).Delete(); err != nil {
+							r.Return(err)
+							return
+						}
+						node.Send(n, "UnsetValue", action.Selector)
 					}))
 					defer peer.Close()
 					go m.handlePeer(peer)
@@ -114,7 +251,9 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 
 func (m *Inspector) Signaled(s signal.Signal[node.Node]) {
 	n := node.Snapshot(s.Receiver.(node.Node))
+	// log.Println("<- signaled", n.ID, s.Name, s.Args)
 	m.updates.Publish(n)
+	// log.Println("-> published", n.ID, s.Name, s.Args)
 }
 
 func (m *Inspector) handlePeer(peer *talk.Peer) {
@@ -140,6 +279,7 @@ func (m *Inspector) handlePeer(peer *talk.Peer) {
 	m.updates.Subscribe(updates)
 	go func() {
 		for n := range updates {
+			// log.Println("update:", n.ID)
 			nn := m.Object().Realm().Resolve(n.ID)
 			if nn == nil {
 				// deleted
@@ -155,6 +295,11 @@ func (m *Inspector) handlePeer(peer *talk.Peer) {
 			}
 			stateMu.Lock()
 			stateBuffer[n.ID] = n
+			// var ids []string
+			// for id := range stateBuffer {
+			// 	ids = append(ids, id)
+			// }
+			// log.Println("stateBuffer:", ids)
 			stateMu.Unlock()
 		}
 	}()
@@ -172,6 +317,11 @@ func (m *Inspector) handlePeer(peer *talk.Peer) {
 		}
 		state := stateBuffer
 		stateBuffer = map[string]any{}
+		// var ids []string
+		// for id := range state {
+		// 	ids = append(ids, id)
+		// }
+		// log.Println("flush:", ids)
 		stateMu.Unlock()
 		if _, err := peer.Call(context.Background(), "update", state, nil); err != nil {
 			m.ticker.Unsubscribe(ticks)

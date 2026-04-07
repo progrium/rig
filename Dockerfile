@@ -1,5 +1,8 @@
 FROM golang:alpine
-RUN apk add --no-cache nodejs npm
+RUN apk add --no-cache nodejs npm bash sudo
+RUN adduser -D -s /bin/bash claude && \
+    echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+RUN npm install -g @anthropic-ai/claude-code
 WORKDIR /go/src/github.com/progrium/rig
 COPY go.mod go.sum ./
 RUN go mod download

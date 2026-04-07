@@ -142,6 +142,10 @@ func (n *N) Error() error {
 	return node.Error(n)
 }
 
+func (n *N) Destroy() error {
+	return node.Destroy(n)
+}
+
 // DupVal uses reflection to duplicate a value
 func dupVal(v any) any {
 	if v == nil {

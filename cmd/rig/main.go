@@ -16,12 +16,21 @@ func main() {
 	cmd := &cli.Command{
 		Version: Version,
 		Usage:   "rig",
-		Short:   "Hi",
-		Long:    `Hello world\nAgain\n\n`,
+		Short:   "Rig object model and runtime",
 	}
 	cmd.AddCommand(serveCmd())
-	cmd.AddCommand(inspectCmd())
 	cmd.AddCommand(treeCmd())
+	cmd.AddCommand(getCmd())
+	cmd.AddCommand(signalCmd())
+	cmd.AddCommand(destroyCmd())
+	cmd.AddCommand(duplicateCmd())
+	cmd.AddCommand(moveCmd())
+	cmd.AddCommand(renameCmd())
+	cmd.AddCommand(attrCmd())
+	cmd.AddCommand(valueCmd())
+	cmd.AddCommand(catalogCmd())
+	cmd.AddCommand(addCmd())
+	cmd.AddCommand(addComponentCmd())
 
 	if err := cli.Execute(context.Background(), cmd, os.Args[1:]); err != nil {
 		log.Fatal(err)

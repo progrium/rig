@@ -15,7 +15,6 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/google/uuid"
-	"github.com/progrium/rig/net/tcp"
 	"github.com/progrium/rig/web"
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/mux"
@@ -47,7 +46,6 @@ func serve(ctx *cli.Context, args []string) {
 	k.AddModule("#pipe", &pipe.Allocator{})
 	k.AddModule("#ramfs", &ramfs.Allocator{})
 	k.AddModule("#term", ts)
-	k.AddModule("#net/tcp", tcp.New())
 
 	root, err := k.NewRoot()
 	if err != nil {
@@ -55,7 +53,6 @@ func serve(ctx *cli.Context, args []string) {
 	}
 
 	root.Bind("#term", "term")
-	root.Bind("#net", "net")
 
 	cwd, err := os.Getwd()
 	if err != nil {

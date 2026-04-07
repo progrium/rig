@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Signal[T any] struct {
@@ -45,7 +46,18 @@ func (w *Dispatcher[T]) Unwatch(n Receiver[T]) {
 func (w *Dispatcher[T]) Signaled(s Signal[T]) {
 	w.m.Range(func(k, v any) bool {
 		if n, ok := v.(Receiver[T]); ok {
-			n.Signaled(s)
+			done := make(chan struct{})
+			go func() {
+				n.Signaled(s)
+				close(done)
+			}()
+			select {
+			case <-done:
+				// completed within timeout
+			case <-time.After(1 * time.Second):
+				log.Println("warning: Signal handler timeout for", reflect.TypeOf(n))
+				w.Unwatch(n)
+			}
 		}
 		return true
 	})

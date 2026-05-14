@@ -107,7 +107,8 @@ type Node interface {
 	// Path() string
 
 	// List() List       // Siblings?
-	Objects() List    // ChildNodes?
+
+	Children() List   // ChildNodes?
 	Components() List // ComponentNodes?
 
 	ComponentType() string

@@ -36,7 +36,7 @@ func (fsys *FS) resolvePath(name string) (manifold.Node, bool) {
 	parts := strings.Split(strings.TrimLeft(name, "/."), "/")
 	obj := fsys.Object()
 	for _, name := range parts {
-		n, ok := obj.Objects().FindByName(name)
+		n, ok := obj.Children().FindByName(name)
 		if !ok {
 			return nil, false
 		}
@@ -83,7 +83,7 @@ func (fsys *FS) stat(name string) (*fileInfo, error) {
 		return nil, fs.ErrNotExist
 	}
 
-	size := n.Objects().Count()
+	size := n.Children().Count()
 
 	fr := node.Get[FileReader](n)
 	if fr != nil {
@@ -91,7 +91,7 @@ func (fsys *FS) stat(name string) (*fileInfo, error) {
 		size = len(data)
 	}
 
-	isDir := n.Objects().Count() > 0
+	isDir := n.Children().Count() > 0
 	i := &fileInfo{
 		name:    n.Name(),
 		size:    int64(size),
@@ -122,7 +122,7 @@ func (fsys *FS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 
 	var out []fs.DirEntry
-	for _, child := range n.Objects().Nodes() {
+	for _, child := range n.Children().Nodes() {
 		info, err := fsys.stat(filepath.Join(name, child.Name()))
 		if err != nil {
 			return nil, err

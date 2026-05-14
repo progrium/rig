@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -49,6 +50,10 @@ type Main struct {
 	if err := cmd.Run(); err != nil {
 		log.Fatal("tidy:", err)
 	}
+
+	filepath.WalkDir(srcPath, func(path string, d fs.DirEntry, err error) error {
+		return os.Chmod(path, 0777)
+	})
 
 	rebuild := func() bool {
 

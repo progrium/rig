@@ -1,6 +1,7 @@
 package manifold
 
 import (
+	"errors"
 	"reflect"
 
 	node "github.com/progrium/rig/pkg/node"
@@ -88,7 +89,7 @@ func (n *N) AddComponent(v any) (Node, error) {
 	return FromNode(com), nil
 }
 
-func (n *N) Objects() List {
+func (n *N) Children() List {
 	return L{node: n, kind: node.TypeObject}
 }
 
@@ -108,7 +109,7 @@ func (n *N) Duplicate() Node {
 		}
 	}
 
-	for _, c := range n.Objects().Nodes() {
+	for _, c := range n.Children().Nodes() {
 		dup := c.Duplicate()
 		if err := node.AppendSubnode(nn, node.TypeObject, dup.ID()); err != nil {
 			panic(err)
@@ -130,6 +131,10 @@ func (n *N) SetParent(p Node) error {
 	return node.SetParent(n, p.ID())
 }
 
+func (n *N) SetParentID(id string) error {
+	return node.SetParent(n, id)
+}
+
 func (n *N) SetAttr(key, val string) error {
 	return node.SetAttr(n, key, val)
 }
@@ -144,6 +149,39 @@ func (n *N) Error() error {
 
 func (n *N) Destroy() error {
 	return node.Destroy(n)
+}
+
+func (n *N) SiblingIndex() int {
+	parent := n.Parent()
+	if parent == nil {
+		return -1
+	}
+	var children List
+	if n.Kind() == node.TypeObject {
+		children = parent.Children()
+	} else {
+		children = parent.Components()
+	}
+	oldidx, ok := children.IndexOf(n)
+	if !ok {
+		return -1
+	}
+	return oldidx
+}
+
+func (n *N) SetSiblingIndex(idx int) error {
+	oldidx := n.SiblingIndex()
+	if oldidx == -1 {
+		return errors.New("no parent or not in children")
+	}
+	if oldidx == idx {
+		return nil
+	}
+	return node.MoveSubnode(n.Parent(), n.Kind(), oldidx, idx)
+}
+
+func (n *N) Send(sig string, args ...any) error {
+	return node.Send(n.n, sig, args...)
 }
 
 // DupVal uses reflection to duplicate a value

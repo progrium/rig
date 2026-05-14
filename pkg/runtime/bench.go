@@ -607,7 +607,7 @@ func (t *Workbench) AddItem(id, typ, name string) error {
 			return err
 		}
 	}
-	if err := n.Objects().Append(manifold.FromNode(newnode)); err != nil {
+	if err := n.Children().Append(manifold.FromNode(newnode)); err != nil {
 		return err
 	}
 	return nil
@@ -741,7 +741,7 @@ func (t *Workbench) GetChildren(id string) (items []treeItem) {
 			sub = n.Components().Nodes()
 		}
 		if v == "objects" {
-			sub = append(sub, n.Objects().Nodes()...)
+			sub = append(sub, n.Children().Nodes()...)
 		}
 		for _, child := range sub {
 			items = append(items, t.GetTreeItem(child.ID()))
@@ -797,7 +797,7 @@ func (t *Workbench) nodeItem(n manifold.Node) treeItem {
 	}
 	switch n.Attr("view") {
 	case "objects":
-		count := n.Objects().Count()
+		count := n.Children().Count()
 		if n.Attr("view:components") != "" {
 			count += n.Components().Count()
 		}

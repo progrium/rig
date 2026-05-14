@@ -8,3 +8,5 @@ node_modules
 go.work.sum
 go.work
 /toolkit-go
+.claude.json
+.credentials.json

@@ -30,7 +30,7 @@ func walk(n Node, fn WalkFunc) error {
 			return err
 		}
 	}
-	for _, child := range n.Objects().Nodes() {
+	for _, child := range n.Children().Nodes() {
 		if err := walk(child, fn); err != nil {
 			if err == SkipNode {
 				continue

@@ -60,7 +60,7 @@ func (t *ObjectToggler) Activate(ctx context.Context) error {
 		return nil
 	}
 	if t.IncludeChildren {
-		for _, child := range obj.Objects().Nodes() {
+		for _, child := range obj.Children().Nodes() {
 			if err := node.Activate(ctx, child); err != nil {
 				return err
 			}
@@ -144,7 +144,7 @@ func (t *ObjectToggler) Deactivate(ctx context.Context) error {
 	}
 	t.disable(obj)
 	if t.IncludeChildren {
-		for _, child := range obj.Objects().Nodes() {
+		for _, child := range obj.Children().Nodes() {
 			if err := node.Deactivate(ctx, child); err != nil {
 				return err
 			}

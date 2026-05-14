@@ -15,6 +15,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/google/uuid"
+	"github.com/progrium/rig/pkg/webfs"
 	"github.com/progrium/rig/web"
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/mux"
@@ -68,13 +69,21 @@ func serve(ctx *cli.Context, args []string) {
 	if err := fs.WriteFile(lfsys, "etc/token", []byte(token+"\n"), 0644); err != nil {
 		log.Fatal(err)
 	}
-	fs := http.FileServerFS(web.FS)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.URL.Path == "/" {
 			w.Header().Set("Set-Cookie", fmt.Sprintf("token=%s", token))
 		}
+		http.FileServerFS(web.FS).ServeHTTP(w, r)
+	})
+	http.HandleFunc("/editors/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		fs.ServeHTTP(w, r)
+		editors, err := fs.Sub(web.FS, "editors")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.StripPrefix("/editors/", http.FileServerFS(webfs.New(editors))).ServeHTTP(w, r)
 	})
 
 	http.HandleFunc(fmt.Sprintf("/fsys/%s", token), func(w http.ResponseWriter, r *http.Request) {

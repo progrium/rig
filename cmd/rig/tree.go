@@ -44,7 +44,7 @@ func tree(args []string, showID bool) {
 func treeChildren(n manifold.Node) []manifold.Node {
 	var out []manifold.Node
 	out = append(out, n.Components().Nodes()...)
-	out = append(out, n.Objects().Nodes()...)
+	out = append(out, n.Children().Nodes()...)
 	return out
 }
 

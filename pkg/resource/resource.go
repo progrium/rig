@@ -155,9 +155,9 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 			// add to list component node
 			node.AppendSubnode(lst, node.TypeObject, nn.ID) // error
 			// also add to object, setting its parent
-			parent.Objects().Append(manifold.FromNode(nn)) // todo: avoid FromEntity?
+			parent.Children().Append(manifold.FromNode(nn)) // todo: avoid FromEntity?
 
-			parent.Objects().Remove(n)      // error
+			parent.Children().Remove(n)     // error
 			parent.SetAttr("view", oldView) // error
 		},
 		Cancel: func() {
@@ -169,7 +169,7 @@ func NewNode[C, R, L any](name string, parent manifold.Node, oldView string, cre
 	// todo: errors
 	n.AddComponent(com)
 	node.SetRealm(n, node.GetRealm(parent))
-	parent.Objects().Append(n)
+	parent.Children().Append(n)
 	parent.SetAttr("view", "objects")
 	return n
 }
@@ -202,7 +202,7 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes node.Nodes) {
 				&v,
 			))
 			node.SetRealm(nn, node.GetRealm(com)) // hmmm
-			com.Objects().Append(nn)
+			com.Children().Append(nn)
 			continue
 		}
 		// if found, update value and check sync
@@ -211,7 +211,7 @@ func ListNodes[T any](com manifold.Node, lister Lister[T]) (nodes node.Nodes) {
 		r.CheckSync()
 	}
 	// iterate over children of this component
-	for _, e := range com.Objects().Nodes() {
+	for _, e := range com.Children().Nodes() {
 		// find resource matching latest list
 		v := node.Get[*Resource[T]](e)
 		found := false

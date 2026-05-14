@@ -3,8 +3,10 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -18,12 +20,14 @@ import (
 	"github.com/progrium/rig/pkg/pubsub"
 	"github.com/progrium/rig/pkg/signal"
 	"github.com/progrium/rig/pkg/telepath"
+	"github.com/progrium/rig/web"
 	"golang.org/x/net/websocket"
 	"tractor.dev/toolkit-go/duplex/codec"
 	"tractor.dev/toolkit-go/duplex/fn"
 	"tractor.dev/toolkit-go/duplex/mux"
 	"tractor.dev/toolkit-go/duplex/rpc"
 	"tractor.dev/toolkit-go/duplex/talk"
+	"tractor.dev/toolkit-go/engine/fs/watchfs"
 )
 
 type Action struct {
@@ -62,6 +66,34 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					ws.PayloadType = websocket.BinaryFrame
 					sess := mux.New(ws)
 					peer := talk.NewPeer(sess, codec.CBORCodec{})
+					peer.Handle("watchFile", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var path string
+						c.Receive(&path)
+						w, err := watchfs.New(os.DirFS("/").(fs.StatFS)).Watch(strings.TrimPrefix(path, "/"), &watchfs.Config{
+							Recursive: true,
+						})
+						if err != nil {
+							r.Return("watch error: " + err.Error())
+							return
+						}
+						defer w.Close()
+						ch, err := r.Continue(nil)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						defer ch.Close()
+
+						for event := range w.Iter() {
+							if event.Type == watchfs.EventCreate || event.Type == watchfs.EventWrite {
+								// log.Println("event:", event.Path)
+								if err := r.Send(event.Path); err != nil {
+									log.Println("send error:", err)
+									return
+								}
+							}
+						}
+					}))
 					peer.Handle("fields", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var id string
 						c.Receive(&id)
@@ -104,6 +136,72 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 							}
 						}
 					}))
+
+					peer.Handle("GetAddComponents", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var args []string
+						c.Receive(&args)
+
+						var others []string
+						var main []string
+						for pkgpath := range meta.Components {
+							if strings.HasPrefix(pkgpath, "main.") {
+								main = append(main, pkgpath)
+								continue
+							}
+							others = append(others, pkgpath)
+						}
+						var items []string
+						items = append(items, "--Main")
+						items = append(items, main...)
+						items = append(items, "--Library")
+						items = append(items, others...)
+						r.Return(items)
+					}))
+					peer.Handle("AddComponent", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						var args []string
+						c.Receive(&args)
+						id := args[0]
+						typ := args[1]
+
+						n := manifold.FromNode(m.Object().Realm().Resolve(id))
+						if n == nil {
+							r.Return(fmt.Errorf("not found: %s", id))
+							return
+						}
+
+						t, ok := meta.Components[typ]
+						if !ok {
+							r.Return(fmt.Errorf("%s type not found", typ))
+							return
+						}
+						v := reflect.New(t).Interface()
+						if i, ok := v.(node.Initializer); ok {
+							i.Initialize()
+						}
+
+						com, err := n.AddComponent(v)
+						if err != nil {
+							r.Return(err)
+							return
+						}
+						r.Return(com.SetAttr("enabled", "true"))
+					}))
+
+					peer.Handle("listEditors", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
+						c.Receive(nil)
+						entries, err := fs.ReadDir(web.FS, "editors")
+						if err != nil {
+							r.Return(err)
+							return
+						}
+						var editors []string
+						for _, entry := range entries {
+							if entry.IsDir() {
+								editors = append(editors, entry.Name())
+							}
+						}
+						r.Return(editors)
+					}))
 					peer.Handle("listCatalog", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						c.Receive(nil)
 						var symbols []string
@@ -115,6 +213,7 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					peer.Handle("setValue", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
+						log.Println("setValue", action)
 						parts := strings.SplitN(action.Selector, "/", 2)
 						n := m.Object().Realm().Resolve(parts[0])
 						if n == nil {
@@ -130,6 +229,7 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					peer.Handle("addComponent", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
+						log.Println("addComponent", action)
 						n := m.Object().Realm().Resolve(action.Selector)
 						if n == nil {
 							r.Return(fmt.Errorf("not found: %s", action.Selector))
@@ -163,30 +263,34 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					peer.Handle("addObject", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
-						n := m.Object().Realm().Resolve(action.Selector)
-						if n == nil {
-							r.Return(fmt.Errorf("not found: %s", action.Selector))
-							return
-						}
-						mn := manifold.FromNode(n)
-						if action.Value == nil || action.Value == "" {
+						log.Println("addObject", action)
+						if action.Value == nil {
 							r.Return(fmt.Errorf("name is required"))
 							return
 						}
 						newNode := node.New(action.Value.(string))
-						if err := mn.Realm().Store(newNode); err != nil {
+						if err := m.Object().Realm().Store(newNode); err != nil {
 							r.Return(err)
 							return
 						}
-						if err := mn.Objects().Append(manifold.FromNode(newNode)); err != nil {
-							r.Return(err)
-							return
+						if action.Selector != "" {
+							n := m.Object().Realm().Resolve(action.Selector)
+							if n == nil {
+								r.Return(fmt.Errorf("not found: %s", action.Selector))
+								return
+							}
+							mn := manifold.FromNode(n)
+							if err := mn.Children().Append(manifold.FromNode(newNode)); err != nil {
+								r.Return(err)
+								return
+							}
 						}
 						r.Return(newNode.NodeID())
 					}))
 					peer.Handle("callMethod", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
+						log.Println("callMethod", action)
 						parts := strings.SplitN(action.Selector, "/", 2)
 						n := m.Object().Realm().Resolve(parts[0])
 						if n == nil {
@@ -209,6 +313,7 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 					peer.Handle("unsetValue", rpc.HandlerFunc(func(r rpc.Responder, c *rpc.Call) {
 						var action Action
 						c.Receive(&action)
+						log.Println("unsetValue", action)
 						parts := strings.SplitN(action.Selector, "/", 2)
 						n := m.Object().Realm().Resolve(parts[0])
 						if n == nil {
@@ -251,7 +356,7 @@ func (m *Inspector) Activate(ctx context.Context) (err error) {
 
 func (m *Inspector) Signaled(s signal.Signal[node.Node]) {
 	n := node.Snapshot(s.Receiver.(node.Node))
-	// log.Println("<- signaled", n.ID, s.Name, s.Args)
+	log.Println("<- signaled", n.ID, s.Name, s.Args)
 	m.updates.Publish(n)
 	// log.Println("-> published", n.ID, s.Name, s.Args)
 }

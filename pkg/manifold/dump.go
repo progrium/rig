@@ -35,7 +35,7 @@ func dumpf(w io.Writer, n Node, prefix, indent string, format func(Node) string)
 			dumpf(w, com, prefix+indent+indent, indent, format)
 		}
 	}
-	for _, child := range n.Objects().Nodes() {
+	for _, child := range n.Children().Nodes() {
 		dumpf(w, child, prefix+indent, indent, format)
 	}
 }

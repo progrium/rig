@@ -35,7 +35,7 @@ func TestNode(t *testing.T) {
 		t.Fatal("unexpected attribute")
 	}
 
-	if n.Objects().Count() != 2 {
+	if n.Children().Count() != 2 {
 		t.Fatal("unexpected children count")
 	}
 
@@ -43,7 +43,7 @@ func TestNode(t *testing.T) {
 		t.Fatal("unexpected component count")
 	}
 
-	if n.Objects().Nodes()[1].Value() != "value" {
+	if n.Children().Nodes()[1].Value() != "value" {
 		t.Fatal("unexpected child value")
 	}
 

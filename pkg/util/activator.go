@@ -30,7 +30,7 @@ func (oa *ObjectActivator) ActivateObject(ctx context.Context) error {
 	stateful := false
 
 	if oa.IncludeChildren {
-		for _, child := range obj.Objects().Nodes() {
+		for _, child := range obj.Children().Nodes() {
 			if err := node.Activate(ctx, child); err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ func (oa *ObjectActivator) DeactivateObject(ctx context.Context) error {
 	obj := manifold.FromContext(ctx)
 
 	if oa.IncludeChildren {
-		for _, child := range obj.Objects().Nodes() {
+		for _, child := range obj.Children().Nodes() {
 			if err := node.Deactivate(ctx, child); err != nil {
 				return err
 			}

@@ -36,7 +36,7 @@ func transformTSX(dst io.Writer, src io.Reader) error {
 		JSXFragment: "",
 	})
 	if len(result.Errors) > 0 {
-		fmt.Println(result.Errors)
+		fmt.Println(result.Errors[0], result.Errors[0].Location.File, result.Errors[0].Location.Line, result.Errors[0].Location.Column)
 		return fmt.Errorf("TSX transform errors")
 	}
 	_, err = dst.Write(append([]byte("\n"), result.Code...))
@@ -54,7 +54,7 @@ func transformJSX(dst io.Writer, src io.Reader) error {
 		JSXFragment: "",
 	})
 	if len(result.Errors) > 0 {
-		fmt.Println(result.Errors)
+		fmt.Println(result.Errors[0], result.Errors[0].Location.File, result.Errors[0].Location.Line, result.Errors[0].Location.Column)
 		return fmt.Errorf("JSX transform errors")
 	}
 	_, err = dst.Write(append([]byte("\n"), result.Code...))
@@ -69,7 +69,7 @@ func transformScriptJSX(dst io.Writer, src io.Reader) error {
 			JSXFragment: "",
 		})
 		if len(result.Errors) > 0 {
-			fmt.Println(result.Errors)
+			fmt.Println(result.Errors[0], result.Errors[0].Location.File, result.Errors[0].Location.Line, result.Errors[0].Location.Column)
 		}
 		return append([]byte("\n"), result.Code...)
 	}}, src)

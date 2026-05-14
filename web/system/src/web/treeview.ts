@@ -84,6 +84,7 @@ export class TreeView implements vscode.TreeDataProvider<string> {
         arguments: [id],
         title: 'Inspect',
       };
+      item.iconPath = new vscode.ThemeIcon("symbol-constructor");
       return item;
 
         // const resp = await this.peer.call("GetTreeItem", [id]);

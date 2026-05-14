@@ -1,9 +1,9 @@
 
 import * as vscode from 'vscode';
 import * as duplex from "@progrium/duplex";
-import { rigURI } from './document.js';
+import { manifold } from '../webview/webview.js';
 
-export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: duplex.Peer) {
+export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: duplex.Peer, realm: manifold.Realm) {
     ctx.subscriptions.push(
         
         vscode.commands.registerCommand('manifold.activate', async (id: string) => {
@@ -15,12 +15,23 @@ export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: du
             // treeView._onDidChangeTreeData.fire(undefined);  
         }),
         vscode.commands.registerCommand('manifold.viewSource', async (id: string) => {
-            if (!id) return;
-            const resp = await peer.call("GetTreeItem", [id]);
-            if (!resp.value.description) {
-              return;
-            }
-            openComponentSymbol(resp.value.description);
+            const com = realm.resolve(id)?.raw.Component;
+            if (!com) return;
+            const [path, type] = com.split(".");
+
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0].uri;
+            if (!workspaceFolder) return;
+            const fileUri = vscode.Uri.joinPath(workspaceFolder, "root/go/src", path);
+            const document = await vscode.workspace.openTextDocument(fileUri);
+            await vscode.window.showTextDocument(document);
+            // console.log("viewSource", id);
+            // if (!id) return;
+            // const resp = await peer.call("GetTreeItem", [id]);
+            // if (!resp.value.description) {
+            //   return;
+            // }
+            // filepathForSymbol("main.Main");
+            // openComponentSymbol("main.Main");
         }),
         vscode.commands.registerCommand('manifold.fullReload', async () => {
             await peer.call("Toggle", ["", false]);
@@ -216,7 +227,7 @@ export async function activate(ctx: vscode.ExtensionContext, fsys: any, peer: du
 
 async function openComponentSymbol(symbolPath: string): Promise<Boolean> {
     const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>('vscode.executeWorkspaceSymbolProvider', symbolPath);
-    
+    console.log("open: symbols", symbols);
     // Assuming the first symbol is the desired one. 22 is kind "Struct"
     let symbol = symbols.filter(s => s.kind === 22 && symbolPath.endsWith(s.name))[0];
     if (!symbol) {
@@ -234,6 +245,7 @@ async function openComponentSymbol(symbolPath: string): Promise<Boolean> {
   
 async function filepathForSymbol(symbolPath: string): Promise<string> {
     let symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>('vscode.executeWorkspaceSymbolProvider', symbolPath);
+    console.log("filepath: symbols", symbols);
     if (symbols.length === 0) {
       return "";
     }

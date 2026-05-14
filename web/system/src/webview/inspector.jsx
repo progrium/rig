@@ -61,10 +61,10 @@ export const Inspector = {
                   oninput={oncheck} 
                   checked={isEnabled(f.ID)} />}
                 label={f.Name} 
-                extra={<div data-vscode-context='{"webviewSection": "more", "preventDefaultContextMenuItems": true}'><atom.Icon name="far fa-ellipsis-h" 
+                extra={<div data-vscode-context={`{"webviewSection": "more", "preventDefaultContextMenuItems": true, "id": "${f.ID}"}`}><atom.Icon name="far fa-ellipsis-h" 
                   onclick={(e) => {
                   e.preventDefault();
-                  e.target.dispatchEvent(new MouseEvent("contextmenu", { id: f.ID, bubbles: true, clientX: e.clientX, clientY: e.clientY }));
+                  e.target.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: e.clientX, clientY: e.clientY }));
                   e.stopPropagation();
                   //window.vscode.postMessage({menu: "menu-more", params: {id: f.ID, clientX: e.clientX, clientY: e.clientY}}, "*") 
                   }} 

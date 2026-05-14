@@ -12,9 +12,6 @@ import {
 	workspace,
 } from 'vscode';
 
-//@ts-ignore
-import { WanixFS } from "../wanix/fs.js";
-
 interface RemoteEntry {
     IsDir: boolean;
     Name: string;
@@ -69,19 +66,10 @@ export class WanixBridge implements FileSystemProvider, /*FileSearchProvider, Te
 	private readonly disposable: Disposable;
     private root: string;	
 
-	constructor(wanixReceiver: MessagePort, root: string) {
-		this.ready = new Promise((resolve) => {
-			wanixReceiver.onmessage = async (event) => {
-				// console.log("rcvr", event.data); 
-				if (event.data.wanix) {
-					console.log("wanix port received");
-					const wfsys = new WanixFS(event.data.wanix);
-					this.wfsys = wfsys;
-					resolve(wfsys);
-					// wfsys.waitFor("vm/1/fsys").then(() => {
-					// });
-				}
-			}
+	constructor(wanix: Promise<any>, root: string) {
+		this.ready = wanix;
+		this.ready.then((fsys) => {
+			this.wfsys = fsys;
 		});
 		this.root = root;
 		this.disposable = Disposable.from(

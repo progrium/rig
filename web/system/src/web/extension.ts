@@ -4,12 +4,14 @@ import * as duplex from "@progrium/duplex";
 import { WanixBridge } from './bridge.js';
 import { manifold, util } from '../webview/webview.js';
 
+//@ts-ignore
+import { WanixFS } from "../wanix/fs.js";
+
 import { activate as activateTreeview } from './treeview.js';
 import { activate as activateTerminal } from './terminal.js';
 import { activate as activateInspector } from './inspector.js';
 import { activate as activateCommands } from './commands.js';
 import { activate as activateTempFS } from './tempfs.js';
-import { activate as activateDocument } from './document.js';
 import { activate as activateEditor } from './editor.js';
 
 declare const navigator: unknown;
@@ -19,10 +21,36 @@ export async function activate(context: vscode.ExtensionContext) {
 		console.error("not running in browser");
 		return;
 	}
-	
+
 	const channel = new MessageChannel();
-	const bridge = new WanixBridge(channel.port2, "");
-	context.subscriptions.push(bridge);
+	let speech: MessagePort | null = null;
+	const wanix = new Promise((resolve) => {
+		channel.port2.onmessage = async (event) => {
+			if (event.data.wanix) {
+				console.log("wanix port received");
+				resolve(new WanixFS(event.data.wanix));
+			}
+			if (event.data.speech) {
+				console.log("speech port received");
+				speech = event.data.speech;
+				speech!.onmessage = (e: MessageEvent) => {
+					// console.log("listened:", e.data);
+					vscode.window.activeTerminal?.sendText(e.data);
+				}
+			}
+		}
+	});
+	const bridge = new WanixBridge(wanix, "");
+	context.subscriptions.push(
+		bridge,
+		vscode.commands.registerCommand('rig.listen', async (id: string) => {
+            if (speech === null) {
+				vscode.window.showErrorMessage("No speech port available");
+				return;
+			}
+			speech!.postMessage({});
+        }),
+	);
 	// get our message port from config
 	const port = (context as any).messagePassingProtocol;
 	// send the bridge channel port to env to have a wanix port sent over it
@@ -31,7 +59,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	
 	const fsys = await bridge.ready;
 	const token = (await fsys.readText("root/etc/token")).trim();
-	const realm = new manifold.Realm();
 
 	let peer: any;
 	peer = await util.connectWithRetry("ws://localhost:8080/inspector/"+token, (conn: Conn) => {
@@ -45,6 +72,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		peer.respond();
 		return peer;
 	});
+
+	const realm = new manifold.Realm(peer);
 
 	// peer.handle("signaled", duplex.HandlerFunc(async (r: duplex.Responder, c: duplex.Call) => {
 	// 	const [id] = await c.receive();
@@ -67,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	
 	activateTerminal(context, fsys);	
 	activateTempFS(context, fsys, peer);
-	activateCommands(context, fsys, peer);
+	activateCommands(context, fsys, peer, realm);
 	activateInspector(context, fsys, peer, realm);
 	activateTreeview(context, fsys, peer, realm);
 	activateEditor(context, token, peer, realm);

@@ -41,6 +41,11 @@
   "contributes": {
     "keybindings": [
       {
+        "command": "rig.listen",
+        "key": "alt+\\",
+        "mac": "alt+\\"
+      },
+      {
         "command": "manifold.fullReload",
         "key": "ctrl+r",
         "mac": "cmd+r"
@@ -61,7 +66,7 @@
       ],
       "view/item/context": [
         {
-          "command": "rig.open"
+          "command": "rig.edit"
         },
         {
           "command": "manifold.switchView"
@@ -139,6 +144,26 @@
       ]
     },
     "commands": [
+      {
+        "command": "rig.edit",
+        "title": "Edit Node...",
+        "category": "Rig"
+      },
+      {
+        "command": "rig.createEditor",
+        "title": "Create Editor...",
+        "category": "Rig"
+      },
+      {
+        "command": "rig.listen",
+        "title": "Listen for Speech",
+        "category": "Rig"
+      },
+      {
+        "command": "rig.reload",
+        "title": "Reload Editors",
+        "category": "Rig"
+      },
       {
         "command": "rig.open",
         "title": "Open Node",

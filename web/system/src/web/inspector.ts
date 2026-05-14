@@ -97,9 +97,6 @@ import {
 	inspector
 } from "${this._extensionUri.with({path: "system/dist/webview/webview.js"}).toString()}";
 
-  window.m = m;
-  window.nodes = new manifold.Realm();
-  window.vscode = acquireVsCodeApi();
   
   var peer = undefined;
   peer = await util.connectWithRetry("${this.websocketURL}", (conn) => {
@@ -113,6 +110,10 @@ import {
     }
 	return peer;
   });
+
+  window.m = m;
+  window.nodes = new manifold.Realm(peer);
+  window.vscode = acquireVsCodeApi();
   
   peer.handle("update", duplex.HandlerFunc(async (r, c) => {
     const update = await c.receive();

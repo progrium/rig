@@ -51,12 +51,29 @@
 
         import { duplex } from "./wanix.min.js";
 
+        const speechPort = new MessageChannel();
+        speechPort.port1.onmessage = (event) => {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.onresult = (event) => {
+                // console.log(event.results[0][0].transcript)
+                speechPort.port1.postMessage(event.results[0][0].transcript);
+            }
+            recognition.onerror = (event) => {
+                console.error(event.error);
+            }
+            recognition.start();
+        }
+
         const token = document.cookie.split("; ").find(row => row.startsWith("token=")).split("=")[1];
         const baseURL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
         const ws = new WebSocket(`${baseURL}/fsys/${token}`);
         ws.onopen = async () => {
             const workbench = document.querySelector('rig-workbench');
-            workbench.load(() => websocketToMessagePort(ws));
+            workbench.load(() => ({wanix: websocketToMessagePort(ws), speech: speechPort.port2}));
             // const sess = new duplex.Session(new duplex.PortConn(websocketToMessagePort(ws)));
             // const peer = new duplex.Peer(sess, new duplex.CBORCodec());
             // window.peer = peer;

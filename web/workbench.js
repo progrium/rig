@@ -179,8 +179,9 @@ export function serializeWorkbenchProfile(profile) {
       const ch = new MessageChannel();
       this.port = ch.port2;
       this.port.onmessage = async (event) => {
-        const port = await portCb();
-        event.data.port.postMessage({ wanix: port }, [port]);
+        const obj = await portCb();
+        event.data.port.postMessage(obj, [...Object.values(obj)]);
+   
     };
   
       const pageUrl = new URL(window.location.href);
@@ -210,6 +211,7 @@ export function serializeWorkbenchProfile(profile) {
           webviewContentExternalBaseUrlTemplate,
         },
         configurationDefaults: {
+          "workbench.tree.indent": 12,
           "workbench.secondarySideBar.defaultVisibility": "visible", //"hidden",
           "workbench.statusBar.visible": false,
           "workbench.layoutControl.enabled": false,
